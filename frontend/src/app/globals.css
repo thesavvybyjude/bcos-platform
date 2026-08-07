@@ -2,21 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap");
 
 :root {
-  --bg-primary: #020617;
-  --bg-secondary: #0f172a;
-  --bg-tertiary: #1e293b;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --border-color: #1e293b;
-  --accent: #5c7cfa;
-  --accent-glow: rgba(92, 124, 250, 0.15);
+  --bg-primary: #0c1324;
+  --bg-secondary: #151b2d;
+  --bg-tertiary: #191f31;
+  --text-primary: #dce1fb;
+  --text-secondary: #c4c5d6;
+  --text-muted: #8e90a0;
+  --border-color: #444654;
+  --accent: #b8c4ff;
+  --accent-glow: rgba(184, 196, 255, 0.15);
   --success: #34d399;
-  --warning: #fbbf24;
-  --error: #f87171;
+  --warning: #ffb77d;
+  --error: #ffb4ab;
 }
 
 * {
@@ -43,34 +43,70 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg-secondary);
+  background: #0c1324;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--text-muted);
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.2);
 }
 
-/* Glass card */
+/* Lumina Enterprise Design System Layer */
 @layer components {
+  .glass-panel {
+    background-color: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
   .glass-card {
-    @apply rounded-xl border border-white/5 bg-white/[0.03] backdrop-blur-xl;
-    box-shadow: 0 0 40px rgba(92, 124, 250, 0.04);
+    @apply rounded-xl border border-white/5 bg-white/[0.03] backdrop-blur-xl transition-all duration-300;
+    box-shadow: 0 0 40px rgba(184, 196, 255, 0.04);
   }
 
   .glass-card:hover {
-    @apply border-brand-500/20;
-    box-shadow: 0 0 60px rgba(92, 124, 250, 0.08);
+    @apply border-primary/50;
+    box-shadow: 0 0 60px rgba(184, 196, 255, 0.08);
   }
 
   .stat-card {
-    @apply glass-card p-6 transition-all duration-300;
+    @apply glass-card p-4 flex flex-col justify-between h-32 relative overflow-hidden transition-all duration-300;
+  }
+
+  .stat-card-glow:hover {
+    border-color: rgba(184, 196, 255, 0.5);
+    box-shadow: inset 0 0 20px rgba(184, 196, 255, 0.05);
+  }
+
+  .btn-primary {
+    background-color: #b8c4ff;
+    color: #002585;
+    box-shadow: 0 0 15px rgba(184, 196, 255, 0.3);
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 0 25px rgba(184, 196, 255, 0.5);
+    transform: translateY(-1px);
+  }
+
+  .btn-ghost {
+    background-color: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    transition: all 0.2s ease;
+  }
+
+  .btn-ghost:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
   }
 
   .gradient-text {
-    @apply bg-gradient-to-r from-brand-400 via-brand-300 to-blue-300 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary via-primary-container to-tertiary bg-clip-text text-transparent;
   }
 
   .badge {
@@ -78,41 +114,41 @@ body {
   }
 
   .badge-marketing {
-    @apply bg-purple-500/10 text-purple-400 ring-1 ring-purple-500/20;
+    @apply bg-primary/15 text-primary ring-1 ring-primary/20;
   }
 
   .badge-business {
-    @apply bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20;
+    @apply bg-[#10b981]/15 text-[#10b981] ring-1 ring-[#10b981]/20;
   }
 
   .badge-ceo {
-    @apply bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20;
+    @apply bg-tertiary/15 text-tertiary ring-1 ring-tertiary/20;
   }
 
   .badge-technology {
-    @apply bg-cyan-500/10 text-cyan-400 ring-1 ring-cyan-500/20;
+    @apply bg-cyan-500/15 text-cyan-400 ring-1 ring-cyan-500/20;
   }
 
   .rule-always {
-    @apply border-l-2 border-emerald-500 pl-3;
+    @apply border-l-4 border-l-[#10b981] pl-3;
   }
 
   .rule-never {
-    @apply border-l-2 border-red-500 pl-3;
+    @apply border-l-4 border-l-error pl-3;
   }
 
   .rule-avoid {
-    @apply border-l-2 border-amber-500 pl-3;
+    @apply border-l-4 border-l-tertiary pl-3;
   }
 
   .rule-prefer {
-    @apply border-l-2 border-blue-500 pl-3;
+    @apply border-l-4 border-l-primary pl-3;
   }
 }
 
 /* Glow effect */
 .glow {
   box-shadow:
-    0 0 20px rgba(92, 124, 250, 0.1),
-    0 0 60px rgba(92, 124, 250, 0.05);
+    0 0 20px rgba(184, 196, 255, 0.1),
+    0 0 60px rgba(184, 196, 255, 0.05);
 }

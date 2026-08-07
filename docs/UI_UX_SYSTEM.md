@@ -1,16 +1,17 @@
-# BCOS Platform — UI/UX Design System & Screen Gallery
+# Lumina Enterprise — BCOS UI/UX Design System
 
-**Version:** 1.0.0  
-**Target Audience:** Frontend Engineers, UI/UX Designers, Product Managers  
-**Guiding Design Principle:** The BCOS UI/UX is built to provide an ultra-premium, dark-mode-first, high-density enterprise intelligence interface. Every pixel emphasizes speed, visual clarity, glassmorphic aesthetics, and effortless navigation across 249+ business context modules.
+**Version:** 2.0.0  
+**Design System Name:** Lumina Enterprise  
+**Target Audience:** Frontend Engineers, UI/UX Designers, AI Engineers  
+**Guiding Principle:** Lumina Enterprise is engineered for deep-focus enterprise intelligence. It employs a **Glassmorphic** aesthetic layered over a **Minimalist** foundation, prioritizing high data density without visual clutter. The interface feels like a sophisticated cockpit: dark, immersive, and precise.
 
 ---
 
-## 🖼️ Application Screen Gallery
+## 🖼️ Application Screen Gallery & Layouts
 
-Below are live screenshots capturing the core views of the BCOS Platform web application:
+Below are visual layouts built using the Lumina Enterprise design system:
 
-### 1. Enterprise Intelligence Dashboard
+### 1. Enterprise Command Center Dashboard
 The main command center showcasing realtime stats (249 Modules, 3,731 Principles, 881 Rules, 64 Departments), system operational status, and high-frequency knowledge module cards with department badges.
 
 ![Dashboard Preview](assets/screens/dashboard.png)
@@ -52,74 +53,77 @@ A 2D/3D canvas force-directed graph renderer visualizing 313 nodes and 266 direc
 
 ---
 
-## 🎨 Design Philosophy & Principles
+## 🎨 Brand & Style Guidelines
 
-### 1. High-Density Enterprise Intelligence
-Business leaders and AI engineers need instant access to principles, rules, and decision frameworks. The layout avoids unnecessary fluff, using tight vertical rhythm and clean grid systems to maximize data density without visual clutter.
-
-### 2. Dark-Mode-First & Glassmorphism
-The interface uses deep space backdrops (`#020617` Slate-950) with frosted glass container overlays (`bg-white/[0.03] backdrop-blur-xl border-white/5`), dynamic ambient radial glows, and electric indigo highlights (`#5c7cfa`).
-
-### 3. Immediate Visual Differentiation
-Operational content is categorized visually:
-- **Principles:** Icon-anchored cards with distinct numbering and source quotes.
-- **Typed Rules:** Color-coded border indicators (Emerald for *Always*, Red for *Never*, Amber for *Avoid*, Blue for *Prefer*).
-- **Decision Trees:** Step-by-step logic flows with condition/action branching cards.
-- **Departments:** Color-coded department pill badges.
+The core style relies on translucent layers (`white/[0.03]` with `24px` backdrop blur), subtle refractive borders (`white/5`), and **Primary Indigo** (`#b8c4ff`) accents that appear to emit light against the deep space backdrop (`#0c1324`). This creates a clear hierarchy of information through perceived depth rather than heavy color blocking.
 
 ---
 
-## 📐 Color Palette & Token System
+## 📐 Color Palette Tokens (Lumina Enterprise)
 
-### Base Surface Palette (Slate Dark Scale)
-| Token | Hex / Value | Usage |
+### Surface & Background Tokens
+| Token | Hex | Role / Usage |
 |---|---|---|
-| `--bg-primary` / `surface-900` | `#020617` | Main viewport backdrop |
-| `--bg-secondary` / `surface-800` | `#0f172a` | Sidebar, cards, popovers, headers |
-| `--bg-tertiary` / `surface-700` | `#1e293b` | Borders, subtle dividers, hover backdrops |
-| `--border-color` | `#1e293b` | Primary container borders |
+| `surface` / `background` | `#0c1324` | Primary viewport background |
+| `surface-container-lowest` | `#070d1f` | Deepest layer / inset containers |
+| `surface-container-low` | `#151b2d` | Sidebar navigation, secondary containers |
+| `surface-container` | `#191f31` | Card containers, modal backdrops |
+| `surface-container-high` | `#23293c` | Input backgrounds, dropdowns |
+| `surface-container-highest` | `#2e3447` | Elevating popovers, pill badges |
+| `surface-bright` | `#33394c` | Highlighted borders & hover overlays |
+| `on-surface` | `#dce1fb` | Primary body text |
+| `on-surface-variant` | `#c4c5d6` | Muted labels, icons, subtitles |
 
-### Brand Accent Palette (Electric Indigo)
-| Token | Hex / Value | Usage |
+### Brand & Primary Accent Tokens
+| Token | Hex | Role / Usage |
 |---|---|---|
-| `brand-300` | `#91a7ff` | Subtle text highlights, active state gradients |
-| `brand-400` | `#748ffc` | Secondary button text, icons |
-| `brand-500` / `--accent` | `#5c7cfa` | Primary buttons, active indicators, interactive elements |
-| `brand-600` | `#4c6ef5` | Button hover states |
-| `brand-700` | `#4263eb` | Active focus rings |
-| `--accent-glow` | `rgba(92, 124, 250, 0.15)` | Dynamic card hover glow & radial spotlight |
+| `primary` / `surface-tint` | `#b8c4ff` | Interactive states, primary actions, focused glow |
+| `on-primary` | `#002585` | High-contrast text on primary buttons |
+| `primary-container` | `#6b89ff` | Active tab containers, primary focus fills |
+| `on-primary-container` | `#001f75` | Text on active container fills |
+| `secondary` | `#bec6e0` | Secondary buttons, category chips |
+| `tertiary` | `#ffb77d` | Accent tags, warn state highlights |
 
-### Semantic System Colors
+### Semantic Rule Colors
 | Context | Color / Class | Border Indicator | Usage |
 |---|---|---|---|
-| **Always (Rule)** | `#34d399` Emerald | `border-l-2 border-emerald-500` | Mandatory operational directives |
-| **Never (Rule)** | `#f87171` Red | `border-l-2 border-red-500` | Prohibited actions & anti-patterns |
-| **Avoid (Rule)** | `#fbbf24` Amber | `border-l-2 border-amber-500` | Cautionary guidelines & friction risks |
-| **Prefer (Rule)** | `#60a5fa` Blue | `border-l-2 border-blue-500` | Recommended default practices |
+| **Always (Rule)** | `#10b981` Emerald | `border-l-4 border-l-[#10b981]` | Mandatory operational directives |
+| **Never (Rule)** | `#ffb4ab` Error Red | `border-l-4 border-l-error` | Prohibited actions & anti-patterns |
+| **Avoid (Rule)** | `#ffb77d` Tertiary Amber | `border-l-4 border-l-tertiary` | Cautionary guidelines & friction risks |
+| **Prefer (Rule)** | `#b8c4ff` Primary Indigo | `border-l-4 border-l-primary` | Recommended default practices |
 
 ---
 
-## 🔤 Typography & Font Hierarchy
+## 🔤 Typography Specification
 
-The BCOS Platform utilizes **Inter** for clean UI readability and **JetBrains Mono** for code snippets, JSON payloads, and system prompt compilations.
+Information density is maintained by a slightly reduced base font size (14px) and tight line-heights.
 
-### Font Scale
-| Element | Font Family | Weight | Size / Line Height | Tailwind Class |
-|---|---|---|---|---|
-| **Hero Heading** | Inter | 800 (ExtraBold) | 2.25rem / 2.5rem | `text-4xl font-extrabold tracking-tight` |
-| **Section Title** | Inter | 700 (Bold) | 1.5rem / 2rem | `text-2xl font-bold` |
-| **Card Title** | Inter | 600 (SemiBold) | 1.125rem / 1.75rem | `text-lg font-semibold` |
-| **Body Text** | Inter | 400 (Regular) | 0.875rem / 1.25rem | `text-sm text-slate-300` |
-| **Muted Text** | Inter | 400 (Regular) | 0.75rem / 1rem | `text-xs text-slate-500` |
-| **Code & Markdown** | JetBrains Mono | 500 (Medium) | 0.8125rem / 1.25rem | `font-mono text-xs text-slate-200` |
+### Font Scale (Tailwind Configuration)
+| Class Name | Font Family | Size | Line Height | Weight / Tracking | Usage |
+|---|---|---|---|---|---|
+| `display-lg` | Inter | 32px | 40px | Bold (700) / `-0.02em` | Page Title, Brand Headers |
+| `headline-md` | Inter | 20px | 28px | SemiBold (600) / `-0.01em` | Section Titles, Card Headers |
+| `body-base` | Inter | 14px | 20px | Regular (400) | Primary Body Text |
+| `body-sm` | Inter | 12px | 16px | Regular (400) | Captions, Metadata |
+| `mono-label` | JetBrains Mono | 11px | 14px | Medium (500) / `0.05em` UPPERCASE | Department Tags, Badges |
+| `data-point` | JetBrains Mono | 13px | 16px | SemiBold (600) | Numeric Metrics, Counters |
 
 ---
 
-## 📱 Layout Grid & Responsive Breakpoints
+## 📏 Shapes, Radius & Spacing Grid
 
-| Device Class | Breakpoint | Column Layout | Sidebar Behavior |
-|---|---|---|---|
-| **Mobile** | `< 640px` | 1 Column | Collapsed into drawer menu |
-| **Tablet** | `640px – 1024px` | 2 Columns | Icon-only collapsible rail |
-| **Desktop** | `1024px – 1536px` | 3 Columns | Fixed 256px sidebar |
-| **Ultra-Wide** | `> 1536px` | 4 Columns | Fixed 280px sidebar with extended context preview |
+- **Vertical Rhythm:** 4px baseline unit (`unit: 4px`). High-density components use 8px (`density-tight`).
+- **Margins & Gutters:** Desktop side margins locked at `24px` (`margin: 24px`), gutters at `16px` (`gutter: 16px`).
+- **Border Radii:**
+  - Standard Cards / Inputs: `4px` (`rounded`)
+  - Floating Panels: `8px` (`rounded-lg` / `rounded-xl`)
+  - Department Pills: Fully rounded (`rounded-full`)
+
+---
+
+## 💫 Elevation & Depth Levels
+
+1. **Level 0 (Base):** Deep Space background (`#0c1324`).
+2. **Level 1 (Navigation Sidebar):** `#151b2d` with 1px `white/5` right border.
+3. **Level 2 (Glass Cards):** Frosted glass (`white/[0.03]`) with `backdrop-blur-xl`.
+4. **Level 3 (Popovers/Modals):** Frosted glass with `white/[0.08]` inner glow and `0 20px 50px rgba(0,0,0,0.5)` drop shadow.
