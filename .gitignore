@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.Python
+env/
+venv/
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+*.whl
+
+# Node
+node_modules/
+.pnpm-store/
+.next/
+out/
+dist/
+*.tsbuildinfo
+.turbo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Docker
+*.pid
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+*.local
+.env.*.local
+
+# Data (except the knowledge base)
+data/*.db
+data/chroma/
+data/neo4j/
+data/postgres/
+data/redis/
+backend/data/
+
+# Alembic
+.alembic/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Misc
+*.tmp
+*.bak
+
+# Docker Compose override
+docker-compose.override.yml

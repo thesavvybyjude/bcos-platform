@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+:root {
+  --bg-primary: #020617;
+  --bg-secondary: #0f172a;
+  --bg-tertiary: #1e293b;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border-color: #1e293b;
+  --accent: #5c7cfa;
+  --accent-glow: rgba(92, 124, 250, 0.15);
+  --success: #34d399;
+  --warning: #fbbf24;
+  --error: #f87171;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  font-family: "Inter", system-ui, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Glass card */
+@layer components {
+  .glass-card {
+    @apply rounded-xl border border-white/5 bg-white/[0.03] backdrop-blur-xl;
+    box-shadow: 0 0 40px rgba(92, 124, 250, 0.04);
+  }
+
+  .glass-card:hover {
+    @apply border-brand-500/20;
+    box-shadow: 0 0 60px rgba(92, 124, 250, 0.08);
+  }
+
+  .stat-card {
+    @apply glass-card p-6 transition-all duration-300;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-brand-400 via-brand-300 to-blue-300 bg-clip-text text-transparent;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-medium;
+  }
+
+  .badge-marketing {
+    @apply bg-purple-500/10 text-purple-400 ring-1 ring-purple-500/20;
+  }
+
+  .badge-business {
+    @apply bg-emerald-500/10 text-emerald-400 ring-1 ring-emerald-500/20;
+  }
+
+  .badge-ceo {
+    @apply bg-amber-500/10 text-amber-400 ring-1 ring-amber-500/20;
+  }
+
+  .badge-technology {
+    @apply bg-cyan-500/10 text-cyan-400 ring-1 ring-cyan-500/20;
+  }
+
+  .rule-always {
+    @apply border-l-2 border-emerald-500 pl-3;
+  }
+
+  .rule-never {
+    @apply border-l-2 border-red-500 pl-3;
+  }
+
+  .rule-avoid {
+    @apply border-l-2 border-amber-500 pl-3;
+  }
+
+  .rule-prefer {
+    @apply border-l-2 border-blue-500 pl-3;
+  }
+}
+
+/* Glow effect */
+.glow {
+  box-shadow:
+    0 0 20px rgba(92, 124, 250, 0.1),
+    0 0 60px rgba(92, 124, 250, 0.05);
+}
