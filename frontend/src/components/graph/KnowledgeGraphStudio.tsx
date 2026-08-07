@@ -3,53 +3,42 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   Search,
-  Layers,
   FolderTree,
-  Tag,
   Star,
   Clock,
-  SlidersHorizontal,
-  Maximize2,
   ZoomIn,
   ZoomOut,
   RefreshCw,
   Download,
-  Share2,
   Sparkles,
-  MessageSquare,
   Activity,
   GitBranch,
   X,
   ChevronLeft,
   ChevronRight,
   Eye,
-  FileText,
   Calendar,
   ShieldAlert,
   BarChart2,
-  Minimize2,
   CheckCircle2,
   Info,
   Send,
-  HelpCircle,
-  Link,
-  Code,
-  Box,
   Copy,
-  Check,
-  Zap,
+  Sun,
+  Moon,
+  Compass,
 } from "lucide-react";
 import { type GraphData, type GraphNode, type GraphLink, api } from "@/lib/api";
 
 // ── Node Type Palette Specification ──
 const NODE_TYPES = [
-  { id: "concept", label: "Concepts", color: "#60a5fa", bg: "bg-blue-500/10 text-blue-400 border-blue-500/20" },
-  { id: "person", label: "People", color: "#c084fc", bg: "bg-purple-500/10 text-purple-400 border-purple-500/20" },
-  { id: "organization", label: "Organizations", color: "#34d399", bg: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" },
-  { id: "document", label: "Documents", color: "#fb923c", bg: "bg-orange-500/10 text-orange-400 border-orange-500/20" },
-  { id: "event", label: "Events", color: "#f87171", bg: "bg-red-500/10 text-red-400 border-red-500/20" },
-  { id: "task", label: "Tasks & Rules", color: "#facc15", bg: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20" },
-  { id: "metadata", label: "Metadata", color: "#94a3b8", bg: "bg-slate-500/10 text-slate-400 border-slate-500/20" },
+  { id: "concept", label: "Concepts", color: "#60a5fa" },
+  { id: "person", label: "People", color: "#c084fc" },
+  { id: "organization", label: "Organizations", color: "#34d399" },
+  { id: "document", label: "Documents", color: "#fb923c" },
+  { id: "event", label: "Events", color: "#f87171" },
+  { id: "task", label: "Tasks & Rules", color: "#facc15" },
+  { id: "metadata", label: "Metadata", color: "#94a3b8" },
 ];
 
 const DOMAINS = [
@@ -77,7 +66,7 @@ const RELATIONSHIP_LABELS = [
   "conflicts with",
 ];
 
-const SAMPLE_TAGS = ["#RAG", "#AI-Routing", "#Pricing", "#Scale", "#GDPR", "#Legal", "#Architecture", "#Growth"];
+const SAMPLE_TAGS = ["#RAG", "#AI-Routing", "#Pricing", "#Scale", "#GDPR", "#Architecture", "#Growth"];
 
 export function KnowledgeGraphStudio() {
   // Data State
@@ -94,6 +83,7 @@ export function KnowledgeGraphStudio() {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
 
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node: GraphNode } | null>(null);
@@ -106,7 +96,7 @@ export function KnowledgeGraphStudio() {
   const [aiMessages, setAiMessages] = useState<Array<{ sender: "user" | "ai"; text: string }>>([]);
   const [chatInput, setChatInput] = useState("");
 
-  // Canvas Viewport State
+  // Canvas Viewport & Zoom State
   const [viewMode, setViewMode] = useState<"canvas" | "timeline" | "cluster">("canvas");
   const [analyticsOverlay, setAnalyticsOverlay] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -115,6 +105,7 @@ export function KnowledgeGraphStudio() {
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   // Load Graph Data
   useEffect(() => {
@@ -134,6 +125,17 @@ export function KnowledgeGraphStudio() {
     load();
   }, []);
 
+  // Theme Switcher Sync
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
+    } else {
+      document.documentElement.classList.add("light");
+      document.documentElement.classList.remove("dark");
+    }
+  }, [isDarkMode]);
+
   // Keyboard Shortcuts (Ctrl+F, Esc)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -148,6 +150,30 @@ export function KnowledgeGraphStudio() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // Cursor-Centered Mouse Wheel Zooming
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+      const newZoom = Math.min(Math.max(zoomLevel * zoomFactor, 0.15), 3.0);
+
+      // Focus zoom on cursor position
+      if (canvasRef.current) {
+        const rect = canvasRef.current.getBoundingClientRect();
+        const cursorX = e.clientX - rect.left - rect.width / 2;
+        const cursorY = e.clientY - rect.top - rect.height / 2;
+
+        setPanOffset((prev) => ({
+          x: prev.x - (cursorX / zoomLevel) * (newZoom - zoomLevel),
+          y: prev.y - (cursorY / zoomLevel) * (newZoom - zoomLevel),
+        }));
+      }
+
+      setZoomLevel(newZoom);
+    },
+    [zoomLevel]
+  );
 
   // Filtered nodes
   const filteredNodes = useMemo(() => {
@@ -236,14 +262,14 @@ export function KnowledgeGraphStudio() {
     setIsPanning(false);
   };
 
-  // Node Context Menu
+  // Context Menu Handler
   const handleContextMenu = (e: React.MouseEvent, node: GraphNode) => {
     e.preventDefault();
     e.stopPropagation();
     setContextMenu({ x: e.clientX, y: e.clientY, node });
   };
 
-  // Export Snapshot Helpers
+  // Export Snapshot Helper
   const exportJSON = () => {
     if (!graphData) return;
     const blob = new Blob([JSON.stringify(graphData, null, 2)], { type: "application/json" });
@@ -256,7 +282,7 @@ export function KnowledgeGraphStudio() {
 
   return (
     <div
-      className="flex h-[calc(100vh-5rem)] w-full overflow-hidden bg-[#0c1324] text-[#dce1fb] rounded-xl border border-white/5 shadow-2xl relative select-none"
+      className="flex h-[calc(100vh-5rem)] w-full overflow-hidden bg-var-bg-primary text-var-text-primary rounded-xl border border-white/5 shadow-2xl relative select-none"
       onClick={() => setContextMenu(null)}
     >
       {/* ── 1. LEFT SIDEBAR: KNOWLEDGE EXPLORER ── */}
@@ -429,10 +455,12 @@ export function KnowledgeGraphStudio() {
 
       {/* ── 2. CENTER: INFINITE CANVAS WORKSPACE ── */}
       <main
+        ref={canvasRef}
         className="flex-1 flex flex-col relative overflow-hidden bg-[#0c1324]"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onWheel={handleWheel}
       >
         {/* Top Control Toolbar */}
         <div className="h-12 border-b border-white/5 bg-[#151b2d]/60 backdrop-blur-md px-4 flex items-center justify-between z-10">
@@ -450,8 +478,17 @@ export function KnowledgeGraphStudio() {
             </div>
           </form>
 
-          {/* View Modes & Action Tools */}
+          {/* View Modes, Theme & Action Tools */}
           <div className="flex items-center gap-2">
+            {/* Theme Toggle (Light / Dark Mode) */}
+            <button
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className="p-2 bg-[#191f31] border border-white/5 hover:bg-white/5 text-slate-300 hover:text-white rounded-lg transition-colors"
+              title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {isDarkMode ? <Sun className="h-3.5 w-3.5 text-amber-400" /> : <Moon className="h-3.5 w-3.5 text-blue-400" />}
+            </button>
+
             {/* View Mode Toggle */}
             <div className="flex items-center bg-[#070d1f] p-1 rounded-lg border border-white/5 text-xs font-mono">
               <button
@@ -503,17 +540,18 @@ export function KnowledgeGraphStudio() {
               <Download className="h-3.5 w-3.5" />
             </button>
 
-            {/* Canvas Zoom Actions */}
+            {/* Canvas Zoom Actions & Level Percentage Display */}
             <div className="flex items-center gap-1 bg-[#191f31] p-1 rounded-lg border border-white/5">
               <button
-                onClick={() => setZoomLevel((z) => Math.min(z + 0.2, 2.5))}
+                onClick={() => setZoomLevel((z) => Math.min(z + 0.2, 3.0))}
                 className="p-1.5 text-slate-400 hover:text-white rounded hover:bg-white/5 transition-colors"
                 title="Zoom In"
               >
                 <ZoomIn className="h-3.5 w-3.5" />
               </button>
+              <span className="text-[10px] font-mono text-slate-400 px-1">{Math.round(zoomLevel * 100)}%</span>
               <button
-                onClick={() => setZoomLevel((z) => Math.max(z - 0.2, 0.4))}
+                onClick={() => setZoomLevel((z) => Math.max(z - 0.2, 0.15))}
                 className="p-1.5 text-slate-400 hover:text-white rounded hover:bg-white/5 transition-colors"
                 title="Zoom Out"
               >
@@ -543,7 +581,7 @@ export function KnowledgeGraphStudio() {
         </div>
 
         {/* Infinite Canvas Viewport */}
-        <div className="flex-1 relative overflow-hidden">
+        <div className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing">
           {/* Thin Grid Background */}
           <div
             className="absolute inset-0 pointer-events-none opacity-20"
@@ -569,7 +607,7 @@ export function KnowledgeGraphStudio() {
                 transformOrigin: "center center",
               }}
             >
-              {/* SVG Link Layer */}
+              {/* SVG Curved Link Layer with Relationship Labels */}
               <svg className="absolute inset-0 w-full h-full pointer-events-none">
                 {graphData?.links.map((link, idx) => {
                   const sourceNode = graphData.nodes.find((n) => n.id === link.source);
@@ -580,25 +618,43 @@ export function KnowledgeGraphStudio() {
                     selectedNode && (selectedNode.id === sourceNode.id || selectedNode.id === targetNode.id);
 
                   const relLabel = RELATIONSHIP_LABELS[idx % RELATIONSHIP_LABELS.length];
+                  const x1 = (idx * 45 + 100) % 900;
+                  const y1 = (idx * 30 + 100) % 600;
+                  const x2 = (idx * 65 + 200) % 900;
+                  const y2 = (idx * 40 + 200) % 600;
 
                   return (
                     <g key={idx}>
                       <line
-                        x1={(idx * 45 + 100) % 900}
-                        y1={(idx * 30 + 100) % 600}
-                        x2={(idx * 65 + 200) % 900}
-                        y2={(idx * 40 + 200) % 600}
+                        x1={x1}
+                        y1={y1}
+                        x2={x2}
+                        y2={y2}
                         stroke={isConnected ? "#b8c4ff" : "rgba(142, 144, 160, 0.15)"}
                         strokeWidth={isConnected ? 2 : 1}
                         strokeDasharray={isConnected ? "4" : "none"}
                         className={isConnected ? "animate-pulse" : ""}
                       />
+                      {/* Progressive Disclosure: Reveal Relationship Labels at Zoom >= 100% */}
+                      {zoomLevel >= 1.0 && (
+                        <text
+                          x={(x1 + x2) / 2}
+                          y={(y1 + y2) / 2}
+                          fill="#b8c4ff"
+                          fontSize="9"
+                          fontFamily="JetBrains Mono, monospace"
+                          textAnchor="middle"
+                          className="bg-[#0c1324]/80 px-1"
+                        >
+                          {relLabel}
+                        </text>
+                      )}
                     </g>
                   );
                 })}
               </svg>
 
-              {/* Node Cards Layout */}
+              {/* Progressive Disclosure Node Cards */}
               <div className="p-12 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 max-w-6xl mx-auto">
                 {filteredNodes.slice(0, 30).map((node) => {
                   const isSelected = selectedNode?.id === node.id;
@@ -641,6 +697,13 @@ export function KnowledgeGraphStudio() {
                       <h4 className="text-xs font-semibold text-[#dce1fb] group-hover:text-white line-clamp-2 mb-2">
                         {node.label}
                       </h4>
+
+                      {/* Progressive Disclosure: Reveal Descriptions at Zoom >= 60% */}
+                      {zoomLevel >= 0.6 && (
+                        <p className="text-[11px] text-slate-400 line-clamp-2 mb-2 leading-relaxed">
+                          Module defining operational standards & governance.
+                        </p>
+                      )}
 
                       {/* Department Tag & Metadata Count */}
                       <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-2 border-t border-white/5">
@@ -785,7 +848,7 @@ export function KnowledgeGraphStudio() {
                       <Star className={`h-4 w-4 ${favorites.includes(selectedNode.id) ? "fill-amber-400 text-amber-400" : ""}`} />
                     </button>
                   </div>
-                  <h3 className="text-base font-bold text-white mb-2">{selectedNode.label}</h3>
+                  <h3 className="text-base font-bold text-[#dce1fb] mb-2">{selectedNode.label}</h3>
 
                   {/* Confidence Score & Date Tag */}
                   <div className="flex items-center gap-3 text-xs font-mono text-slate-400">
