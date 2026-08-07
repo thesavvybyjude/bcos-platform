@@ -19,6 +19,22 @@ The BCOS Platform turns a folder of Markdown files (the BCOS knowledge base) int
 
 ---
 
+## 📸 Screenshots & UI Gallery
+
+### Enterprise Dashboard & Knowledge Graph
+![BCOS Dashboard](docs/assets/screens/dashboard.png)
+
+| Page | URL | Visual Preview |
+|---|---|---|
+| **Knowledge Directory** | `/modules` | ![Modules Directory](docs/assets/screens/modules.png) |
+| **Context Orchestrator** | `/orchestrator` | ![Orchestrator](docs/assets/screens/orchestrator.png) |
+| **AI Context Builder** | `/context` | ![Context Builder](docs/assets/screens/context_builder.png) |
+| **Knowledge Graph** | `/graph` | ![Knowledge Graph](docs/assets/screens/knowledge_graph.png) |
+
+> 🎨 For complete design specifications, typography tokens, and color systems, see the [UI/UX System Document](docs/UI_UX_SYSTEM.md).
+
+---
+
 ## Quick Start
 
 ### Prerequisites
