@@ -1,9 +1,14 @@
-# Lumina Enterprise — BCOS UI/UX Design System
+# UI_UX_SYSTEM.md — Permanent UI/UX Design Authority
 
-**Version:** 2.0.0  
-**Design System Name:** Lumina Enterprise  
-**Target Audience:** Frontend Engineers, UI/UX Designers, AI Engineers  
-**Guiding Principle:** Lumina Enterprise is engineered for deep-focus enterprise intelligence. It employs a **Glassmorphic** aesthetic layered over a **Minimalist** foundation, prioritizing high data density without visual clutter. The interface feels like a sophisticated cockpit: dark, immersive, and precise.
+## Purpose
+
+This document is the **permanent UI/UX design authority** for the BCOS Platform.
+
+Whenever a new page, component, modal, dashboard, workflow, graph, or feature is created or modified, it **MUST comply with this document**.
+
+Never optimize a single screen in isolation.
+
+Always optimize the entire product.
 
 ---
 
@@ -46,84 +51,270 @@ A self-service workspace allowing AI engineers to select specific business conte
 
 ---
 
-### 6. Interactive Neo4j Knowledge Graph (`/graph`)
-A 2D/3D canvas force-directed graph renderer visualizing 313 nodes and 266 directional cross-reference links connecting business departments, modules, and principles.
+### 6. Interactive Knowledge Graph Studio (`/graph`)
+An infinite canvas graph studio featuring D3 force physics, progressive detail disclosure across 5 zoom tiers, cursor-centered zooming, Ask Graph AI drawer, context menus, and theme switching.
 
 ![Knowledge Graph Preview](assets/screens/knowledge_graph.png)
 
 ---
 
-## 🎨 Brand & Style Guidelines
+# Core Philosophy
 
-The core style relies on translucent layers (`white/[0.03]` with `24px` backdrop blur), subtle refractive borders (`white/5`), and **Primary Indigo** (`#b8c4ff`) accents that appear to emit light against the deep space backdrop (`#0c1324`). This creates a clear hierarchy of information through perceived depth rather than heavy color blocking.
+The UI should never look AI-generated.
 
----
+It should feel intentionally designed.
 
-## 📐 Color Palette Tokens (Lumina Enterprise)
+Every screen should communicate:
 
-### Surface & Background Tokens
-| Token | Hex | Role / Usage |
-|---|---|---|
-| `surface` / `background` | `#0c1324` | Primary viewport background |
-| `surface-container-lowest` | `#070d1f` | Deepest layer / inset containers |
-| `surface-container-low` | `#151b2d` | Sidebar navigation, secondary containers |
-| `surface-container` | `#191f31` | Card containers, modal backdrops |
-| `surface-container-high` | `#23293c` | Input backgrounds, dropdowns |
-| `surface-container-highest` | `#2e3447` | Elevating popovers, pill badges |
-| `surface-bright` | `#33394c` | Highlighted borders & hover overlays |
-| `on-surface` | `#dce1fb` | Primary body text |
-| `on-surface-variant` | `#c4c5d6` | Muted labels, icons, subtitles |
+* clarity
+* hierarchy
+* confidence
+* breathing room
+* consistency
+* craftsmanship
 
-### Brand & Primary Accent Tokens
-| Token | Hex | Role / Usage |
-|---|---|---|
-| `primary` / `surface-tint` | `#b8c4ff` | Interactive states, primary actions, focused glow |
-| `on-primary` | `#002585` | High-contrast text on primary buttons |
-| `primary-container` | `#6b89ff` | Active tab containers, primary focus fills |
-| `on-primary-container` | `#001f75` | Text on active container fills |
-| `secondary` | `#bec6e0` | Secondary buttons, category chips |
-| `tertiary` | `#ffb77d` | Accent tags, warn state highlights |
-
-### Semantic Rule Colors
-| Context | Color / Class | Border Indicator | Usage |
-|---|---|---|---|
-| **Always (Rule)** | `#10b981` Emerald | `border-l-4 border-l-[#10b981]` | Mandatory operational directives |
-| **Never (Rule)** | `#ffb4ab` Error Red | `border-l-4 border-l-error` | Prohibited actions & anti-patterns |
-| **Avoid (Rule)** | `#ffb77d` Tertiary Amber | `border-l-4 border-l-tertiary` | Cautionary guidelines & friction risks |
-| **Prefer (Rule)** | `#b8c4ff` Primary Indigo | `border-l-4 border-l-primary` | Recommended default practices |
+If something looks "fine," continue refining until it feels designed.
 
 ---
 
-## 🔤 Typography Specification
+# Global UI Audit
 
-Information density is maintained by a slightly reduced base font size (14px) and tight line-heights.
+Whenever UI changes are made, automatically inspect the entire interface.
 
-### Font Scale (Tailwind Configuration)
-| Class Name | Font Family | Size | Line Height | Weight / Tracking | Usage |
-|---|---|---|---|---|---|
-| `display-lg` | Inter | 32px | 40px | Bold (700) / `-0.02em` | Page Title, Brand Headers |
-| `headline-md` | Inter | 20px | 28px | SemiBold (600) / `-0.01em` | Section Titles, Card Headers |
-| `body-base` | Inter | 14px | 20px | Regular (400) | Primary Body Text |
-| `body-sm` | Inter | 12px | 16px | Regular (400) | Captions, Metadata |
-| `mono-label` | JetBrains Mono | 11px | 14px | Medium (500) / `0.05em` UPPERCASE | Department Tags, Badges |
-| `data-point` | JetBrains Mono | 13px | 16px | SemiBold (600) | Numeric Metrics, Counters |
+Look for:
+
+* inconsistent spacing
+* inconsistent typography
+* inconsistent button sizing
+* uneven padding
+* alignment issues
+* visual imbalance
+* awkward empty space
+* oversized sections
+* tiny click targets
+* duplicated patterns
+* unnecessary borders
+* inconsistent shadows
+* inconsistent radii
+* excessive colors
+* low contrast
+* accessibility failures
+* responsiveness problems
+
+Fix every issue before considering the task complete.
 
 ---
 
-## 📏 Shapes, Radius & Spacing Grid
+# Layout Rules
 
-- **Vertical Rhythm:** 4px baseline unit (`unit: 4px`). High-density components use 8px (`density-tight`).
-- **Margins & Gutters:** Desktop side margins locked at `24px` (`margin: 24px`), gutters at `16px` (`gutter: 16px`).
-- **Border Radii:**
-  - Standard Cards / Inputs: `4px` (`rounded`)
-  - Floating Panels: `8px` (`rounded-lg` / `rounded-xl`)
-  - Department Pills: Fully rounded (`rounded-full`)
+Design entire pages first.
+
+Never build isolated components.
+
+Every page should follow a consistent layout rhythm.
+
+Maintain visual balance between:
+
+Navigation | Canvas | Sidebars | Content | Footer | Dialogs | Floating Panels | Inspector Panels
+
+Nothing should feel randomly placed.
 
 ---
 
-## 💫 Elevation & Depth Levels
+# Grid System
 
-1. **Level 0 (Base):** Deep Space background (`#0c1324`).
-2. **Level 1 (Navigation Sidebar):** `#151b2d` with 1px `white/5` right border.
-3. **Level 2 (Glass Cards):** Frosted glass (`white/[0.03]`) with `backdrop-blur-xl`.
-4. **Level 3 (Popovers/Modals):** Frosted glass with `white/[0.08]` inner glow and `0 20px 50px rgba(0,0,0,0.5)` drop shadow.
+Use a responsive grid.
+
+- **Desktop:** 12 columns
+- **Tablet:** 8 columns
+- **Mobile:** 4 columns
+
+Align components to the grid.
+
+Never eyeball spacing.
+
+---
+
+# Spacing System
+
+Only use the spacing scale:
+
+`4` | `8` | `12` | `16` | `20` | `24` | `32` | `40` | `48` | `64` | `80` | `96` | `128`
+
+Never invent random spacing values.
+
+Whitespace is a design feature.
+
+---
+
+# Typography
+
+Use one consistent typography scale:
+
+- **Display:** 48px
+- **H1:** 40px
+- **H2:** 32px
+- **H3:** 24px
+- **H4:** 20px
+- **Body:** 16px
+- **Small:** 14px
+- **Caption:** 12px
+
+Maintain consistent: line-height, letter spacing, font weight, paragraph spacing.
+
+Avoid walls of text.
+
+---
+
+# Color System
+
+Limit colors:
+- One primary accent (`#b8c4ff` / `#3b82f6`)
+- One success (`#34d399` / `#10b981`)
+- One warning (`#ffb77d` / `#f59e0b`)
+- One danger (`#ffb4ab` / `#ef4444`)
+- Neutral grayscale
+
+Avoid rainbow dashboards. Color should communicate meaning—never decoration.
+
+---
+
+# Component Consistency
+
+Buttons, Cards, Inputs, Dropdowns, Tables, Lists, Badges, Dialogs, Sidebars, Menus must all share:
+- radius (`4px` / `8px` / `12px`)
+- padding
+- hover behavior
+- focus behavior
+- animation speed (`150ms–300ms`)
+- shadow depth
+- typography
+
+---
+
+# Interaction Rules
+
+Every interactive element must provide feedback:
+
+`Hover` | `Focus` | `Pressed` | `Loading` | `Disabled` | `Success` | `Error` | `Selected`
+
+Nothing should feel static.
+
+---
+
+# Motion
+
+Motion should explain, never decorate.
+
+Animations should: guide attention, confirm actions, reduce cognitive load.
+
+Target speed: **150–300ms**.
+
+---
+
+# Responsive Rules
+
+Every feature must function on: Mobile, Tablet, Laptop, Desktop, Ultrawide, 4K.
+
+No broken layouts. No clipped text. No horizontal scrolling. No overlapping components.
+
+---
+
+# Infinite Canvas Rules
+
+Graphs, Mind Maps, Workflows, Knowledge Maps, Whiteboards must support:
+
+* smooth zoom
+* smooth pan
+* infinite canvas
+* fit-to-screen
+* center selection
+* minimap
+* adaptive rendering
+* progressive detail
+* cluster spacing
+* no node overlap
+
+---
+
+# Adaptive Scaling
+
+As screen size changes: typography scales, spacing scales, cards resize, sidebars resize, panels resize, canvas expands.
+
+Nothing should appear stretched. Nothing should become cramped.
+
+---
+
+# Accessibility
+
+Support: Keyboard navigation, visible focus, ARIA labels, WCAG AA contrast, reduced motion support, screen reader support, large click targets, readable typography.
+
+Accessibility is required. Never optional.
+
+---
+
+# Theme System
+
+Support: **Light Mode**, **Dark Mode**, and **System Theme**.
+
+Every component must work perfectly in every theme. Never hardcode colors. Always use design tokens (`var(--bg-primary)`, `var(--text-primary)`, `var(--accent)`).
+
+---
+
+# Anti-AI Slop Rules
+
+Never default to:
+- purple gradients
+- three equal cards
+- glassmorphism everywhere
+- random floating blobs
+- oversized hero sections
+- massive empty whitespace
+- generic icon grids
+- center everything
+
+Instead: Design around hierarchy. Design around purpose. Design around information density. Every screen should feel unique while remaining part of one coherent system.
+
+---
+
+# Design Tokens
+
+Every visual decision must originate from tokens: Typography, Spacing, Radius, Shadow, Border, Color, Animation, Opacity, Elevation.
+
+Never hardcode values.
+
+---
+
+# Design Linting
+
+Before every completion, perform a design review.
+
+Verify:
+- ✓ Layout consistency
+- ✓ Typography consistency
+- ✓ Color consistency
+- ✓ Responsive behavior
+- ✓ Accessibility
+- ✓ Alignment
+- ✓ Visual hierarchy
+- ✓ Empty state quality
+- ✓ Loading state quality
+- ✓ Error state quality
+- ✓ Interaction quality
+- ✓ Animation quality
+- ✓ Theme compatibility
+- ✓ Graph readability
+- ✓ Performance
+- ✓ Production readiness
+
+If any category fails, continue refining until all checks pass.
+
+---
+
+# Golden Rule
+
+Every UI change must improve the product as a whole—not just the screen being edited.
+
+The interface should look as though a senior product designer and design engineer refined every pixel with intention.
+
+When in doubt: Remove clutter. Increase hierarchy. Improve spacing. Simplify interactions. Preserve consistency. Optimize for humans first.
