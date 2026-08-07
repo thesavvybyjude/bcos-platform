@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Search,
   FolderTree,
@@ -45,32 +46,43 @@ import {
   BookOpen,
   Boxes,
   Network,
+  Compass,
 } from "lucide-react";
 import { type GraphData, type GraphNode, type GraphLink, api } from "@/lib/api";
 
-// ── Mind Map Node Data Structure ──
-interface MindMapConcept {
-  id: string;
-  label: string;
-  type: "root" | "branch" | "leaf";
-  color: string;
-  icon?: any;
+interface MindMapNode extends GraphNode {
   x: number;
   y: number;
-  parentId?: string;
-  children?: MindMapConcept[];
+  radius: number;
+  level: "root" | "domain" | "module";
+  color: string;
+  clusterId: string;
+  icon?: any;
+}
+
+interface MindMapLink {
+  sourceId: string;
+  targetId: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  label: string;
+  color: string;
 }
 
 export function KnowledgeGraphStudio() {
-  // Data State
+  const router = useRouter();
+
+  // Data State from Real Database API
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Interaction State
   const [searchQuery, setSearchQuery] = useState("");
   const [naturalLanguageQuery, setNaturalLanguageQuery] = useState("");
-  const [selectedNode, setSelectedNode] = useState<any | null>(null);
-  const [hoveredNode, setHoveredNode] = useState<any | null>(null);
+  const [selectedNode, setSelectedNode] = useState<MindMapNode | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<MindMapNode | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [activeTool, setActiveTool] = useState<"select" | "pan" | "grid" | "crop" | "link">("select");
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -92,14 +104,14 @@ export function KnowledgeGraphStudio() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
 
-  // Load Graph Data
+  // Load Real Database Graph Data
   useEffect(() => {
     async function load() {
       try {
         const data = await api.getGraphData();
         setGraphData(data);
       } catch (err) {
-        console.error("Failed to load knowledge graph data:", err);
+        console.error("Failed to load real knowledge graph data:", err);
       } finally {
         setLoading(false);
       }
@@ -121,135 +133,173 @@ export function KnowledgeGraphStudio() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // ── REFERENCE MIND MAP DATA TREE STRUCTURE ──
-  const mindMapTree = useMemo(() => {
-    const rootX = 1000;
-    const rootY = 700;
+  // ── DYNAMIC MIND MAP LAYOUT GENERATOR FOR REAL DATABASE DATA ──
+  const { mindMapNodes, mindMapLinks } = useMemo(() => {
+    if (!graphData || graphData.nodes.length === 0) return { mindMapNodes: [], mindMapLinks: [] };
 
-    const root: MindMapConcept = {
-      id: "rag-root",
-      label: "Retrieval Augmented Generation",
-      type: "root",
+    const nodes: MindMapNode[] = [];
+    const links: MindMapLink[] = [];
+
+    // Group real nodes by department
+    const deptMap: Record<string, GraphNode[]> = {};
+    graphData.nodes.forEach((n) => {
+      const dept = n.department || "General";
+      if (!deptMap[dept]) deptMap[dept] = [];
+      deptMap[dept].push(n);
+    });
+
+    const activeDepts = Object.keys(deptMap);
+    const centerCanvasX = 1600;
+    const centerCanvasY = 1200;
+
+    // 1. Central Hero Root Node: BCOS Knowledge Platform
+    const rootNodeId = "bcos-master-root";
+    const masterRoot: MindMapNode = {
+      id: rootNodeId,
+      label: "BCOS Knowledge Platform",
+      type: "department",
+      department: "Core Operating System",
+      x: centerCanvasX,
+      y: centerCanvasY,
+      radius: 55,
+      level: "root",
       color: "#b8c4ff",
+      clusterId: "master",
       icon: Brain,
-      x: rootX,
-      y: rootY,
-      children: [
-        {
-          id: "core-concepts",
-          label: "Core Concepts",
-          type: "branch",
-          color: "#60a5fa",
-          icon: Lightbulb,
-          x: rootX - 320,
-          y: rootY - 180,
-          children: [
-            { id: "rag-1", label: "What is RAG?", type: "leaf", color: "#60a5fa", x: rootX - 580, y: rootY - 260 },
-            { id: "rag-2", label: "How it Works", type: "leaf", color: "#60a5fa", x: rootX - 580, y: rootY - 210 },
-            { id: "rag-3", label: "Key Components", type: "leaf", color: "#60a5fa", x: rootX - 580, y: rootY - 160 },
-            { id: "rag-4", label: "RAG vs Fine-tuning", type: "leaf", color: "#60a5fa", x: rootX - 580, y: rootY - 110 },
-          ],
-        },
-        {
-          id: "tech-stack",
-          label: "Tech Stack",
-          type: "branch",
-          color: "#fb923c",
-          icon: Code2,
-          x: rootX - 360, y: rootY + 40,
-          children: [
-            { id: "tech-1", label: "LLMs", type: "leaf", color: "#fb923c", x: rootX - 620, y: rootY - 60 },
-            { id: "tech-2", label: "Vector Databases", type: "leaf", color: "#fb923c", x: rootX - 620, y: rootY - 10 },
-            { id: "tech-3", label: "Embeddings", type: "leaf", color: "#fb923c", x: rootX - 620, y: rootY + 40 },
-            { id: "tech-4", label: "Frameworks", type: "leaf", color: "#fb923c", x: rootX - 620, y: rootY + 90 },
-            { id: "tech-5", label: "APIs & Tools", type: "leaf", color: "#fb923c", x: rootX - 620, y: rootY + 140 },
-          ],
-        },
-        {
-          id: "best-practices",
-          label: "Best Practices",
-          type: "branch",
-          color: "#f472b6",
-          icon: Star,
-          x: rootX - 280, y: rootY + 260,
-          children: [
-            { id: "bp-1", label: "Chunking Strategies", type: "leaf", color: "#f472b6", x: rootX - 540, y: rootY + 190 },
-            { id: "bp-2", label: "Indexing Methods", type: "leaf", color: "#f472b6", x: rootX - 540, y: rootY + 240 },
-            { id: "bp-3", label: "Re-ranking", type: "leaf", color: "#f472b6", x: rootX - 540, y: rootY + 290 },
-            { id: "bp-4", label: "Prompt Engineering", type: "leaf", color: "#f472b6", x: rootX - 540, y: rootY + 340 },
-            { id: "bp-5", label: "Evaluation", type: "leaf", color: "#f472b6", x: rootX - 540, y: rootY + 390 },
-          ],
-        },
-        {
-          id: "related-topics",
-          label: "Related Topics",
-          type: "branch",
-          color: "#facc15",
-          icon: Network,
-          x: rootX - 40, y: rootY + 320,
-          children: [
-            { id: "rel-1", label: "Prompt Engineering", type: "leaf", color: "#facc15", x: rootX - 220, y: rootY + 440 },
-            { id: "rel-2", label: "Fine-tuning", type: "leaf", color: "#facc15", x: rootX - 80, y: rootY + 470 },
-            { id: "rel-3", label: "Knowledge Graphs", type: "leaf", color: "#facc15", x: rootX + 80, y: rootY + 470 },
-            { id: "rel-4", label: "Semantic Search", type: "leaf", color: "#facc15", x: rootX + 240, y: rootY + 440 },
-          ],
-        },
-        {
-          id: "applications",
-          label: "Applications",
-          type: "branch",
-          color: "#34d399",
-          icon: Boxes,
-          x: rootX + 320, y: rootY - 180,
-          children: [
-            { id: "app-1", label: "Enterprise Search", type: "leaf", color: "#34d399", x: rootX + 580, y: rootY - 260 },
-            { id: "app-2", label: "AI Assistants", type: "leaf", color: "#34d399", x: rootX + 580, y: rootY - 210 },
-            { id: "app-3", label: "Content Generation", type: "leaf", color: "#34d399", x: rootX + 580, y: rootY - 160 },
-            { id: "app-4", label: "Decision Support", type: "leaf", color: "#34d399", x: rootX + 580, y: rootY - 110 },
-          ],
-        },
-        {
-          id: "challenges",
-          label: "Challenges",
-          type: "branch",
-          color: "#c084fc",
-          icon: AlertTriangle,
-          x: rootX + 360, y: rootY + 40,
-          children: [
-            { id: "chal-1", label: "Hallucination", type: "leaf", color: "#c084fc", x: rootX + 620, y: rootY - 60 },
-            { id: "chal-2", label: "Latency", type: "leaf", color: "#c084fc", x: rootX + 620, y: rootY - 10 },
-            { id: "chal-3", label: "Data Quality", type: "leaf", color: "#c084fc", x: rootX + 620, y: rootY + 40 },
-            { id: "chal-4", label: "Cost", type: "leaf", color: "#c084fc", x: rootX + 620, y: rootY + 90 },
-            { id: "chal-5", label: "Security", type: "leaf", color: "#c084fc", x: rootX + 620, y: rootY + 140 },
-          ],
-        },
-        {
-          id: "resources",
-          label: "Resources",
-          type: "branch",
-          color: "#38bdf8",
-          icon: BookOpen,
-          x: rootX + 300, y: rootY + 260,
-          children: [
-            { id: "res-1", label: "Research Papers", type: "leaf", color: "#38bdf8", x: rootX + 560, y: rootY + 190 },
-            { id: "res-2", label: "Documentation", type: "leaf", color: "#38bdf8", x: rootX + 560, y: rootY + 240 },
-            { id: "res-3", label: "Tutorials", type: "leaf", color: "#38bdf8", x: rootX + 560, y: rootY + 290 },
-            { id: "res-4", label: "Open Source", type: "leaf", color: "#38bdf8", x: rootX + 560, y: rootY + 340 },
-            { id: "res-5", label: "Communities", type: "leaf", color: "#38bdf8", x: rootX + 560, y: rootY + 390 },
-          ],
-        },
-      ],
     };
+    nodes.push(masterRoot);
 
-    return root;
+    // 2. Radial Department Galaxies (R1 = 520px)
+    const domainDistance = 520;
+    const deptAngleStep = (Math.PI * 2) / activeDepts.length;
+
+    activeDepts.forEach((dept, dIdx) => {
+      const deptAngle = dIdx * deptAngleStep - Math.PI / 2;
+      const deptX = centerCanvasX + Math.cos(deptAngle) * domainDistance;
+      const deptY = centerCanvasY + Math.sin(deptAngle) * domainDistance;
+
+      const deptNodeId = `dept-${dept}`;
+      const deptColor =
+        dIdx % 6 === 0
+          ? "#60a5fa"
+          : dIdx % 6 === 1
+          ? "#fb923c"
+          : dIdx % 6 === 2
+          ? "#34d399"
+          : dIdx % 6 === 3
+          ? "#c084fc"
+          : dIdx % 6 === 4
+          ? "#facc15"
+          : "#38bdf8";
+
+      const deptNode: MindMapNode = {
+        id: deptNodeId,
+        label: dept,
+        type: "department",
+        department: dept,
+        x: deptX,
+        y: deptY,
+        radius: 36,
+        level: "domain",
+        color: deptColor,
+        clusterId: dept,
+        icon: Boxes,
+      };
+      nodes.push(deptNode);
+
+      // Link Root -> Department
+      links.push({
+        sourceId: rootNodeId,
+        targetId: deptNodeId,
+        x1: centerCanvasX,
+        y1: centerCanvasY,
+        x2: deptX,
+        y2: deptY,
+        label: "contains",
+        color: deptColor,
+      });
+
+      // 3. Child Module Leaves (R2 = 860px with non-overlapping radial fan out)
+      const childModules = deptMap[dept];
+      const leafDistance = 340;
+      const leafAngleSpan = Math.PI * 0.45;
+      const leafAngleStep = childModules.length > 1 ? leafAngleSpan / (childModules.length - 1) : 0;
+
+      childModules.forEach((mod, mIdx) => {
+        const leafAngle = deptAngle - leafAngleSpan / 2 + mIdx * leafAngleStep;
+        const leafX = deptX + Math.cos(leafAngle) * leafDistance;
+        const leafY = deptY + Math.sin(leafAngle) * leafDistance;
+
+        nodes.push({
+          ...mod,
+          x: leafX,
+          y: leafY,
+          radius: 20,
+          level: "module",
+          color: deptColor,
+          clusterId: dept,
+        });
+
+        links.push({
+          sourceId: deptNodeId,
+          targetId: mod.id,
+          x1: deptX,
+          y1: deptY,
+          x2: leafX,
+          y2: leafY,
+          label: "references",
+          color: deptColor,
+        });
+      });
+    });
+
+    return { mindMapNodes: nodes, mindMapLinks: links };
+  }, [graphData]);
+
+  // Initial Selection of Real Node
+  useEffect(() => {
+    if (mindMapNodes.length > 0 && !selectedNode) {
+      setSelectedNode(mindMapNodes[0]);
+    }
+  }, [mindMapNodes, selectedNode]);
+
+  // Live Filtered Mind Map Nodes
+  const filteredMindMapNodes = useMemo(() => {
+    if (!searchQuery.trim()) return mindMapNodes;
+    const query = searchQuery.toLowerCase();
+
+    return mindMapNodes.filter(
+      (node) =>
+        node.label.toLowerCase().includes(query) ||
+        node.department?.toLowerCase().includes(query) ||
+        node.clusterId.toLowerCase().includes(query)
+    );
+  }, [mindMapNodes, searchQuery]);
+
+  // ── INSTANT CAMERA FOCUS ENGINE ON SEARCH / SELECTION ──
+  const focusCameraOnNode = useCallback((node: MindMapNode) => {
+    setSelectedNode(node);
+    if (!canvasRef.current) return;
+
+    // Calculate center offset for target node
+    const targetZoom = 0.85;
+    const canvasWidth = canvasRef.current.clientWidth || 1000;
+    const canvasHeight = canvasRef.current.clientHeight || 700;
+
+    const newPanX = canvasWidth / 2 - node.x * targetZoom;
+    const newPanY = canvasHeight / 2 - node.y * targetZoom;
+
+    setPanOffset({ x: newPanX, y: newPanY });
+    setZoomLevel(targetZoom);
   }, []);
 
-  // Set initial selected node
-  useEffect(() => {
-    if (mindMapTree && !selectedNode) {
-      setSelectedNode(mindMapTree);
+  // Handle Search Submit / Focus
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (filteredMindMapNodes.length > 0) {
+      focusCameraOnNode(filteredMindMapNodes[0]);
     }
-  }, [mindMapTree, selectedNode]);
+  };
 
   // Cursor-Centered Mouse Wheel Zooming
   const handleWheel = useCallback(
@@ -304,31 +354,24 @@ export function KnowledgeGraphStudio() {
     setChatInput("");
 
     setTimeout(() => {
-      const reply = `Based on the BCOS Knowledge Brain, **${selectedNode?.label || "Retrieval Augmented Generation"}** combines external knowledge vector retrieval with LLM generation to improve accuracy and reduce hallucination.`;
+      const reply = `Based on the BCOS Knowledge Base, node **${selectedNode?.label || "BCOS"}** defines operational principles in **${selectedNode?.department || "General"}**. It links directly to 4 business context modules.`;
       setAiMessages((prev) => [...prev, { sender: "ai", text: reply }]);
     }, 600);
   };
 
-  const handleNaturalLanguageSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!naturalLanguageQuery.trim()) return;
-    setSearchQuery(naturalLanguageQuery);
-    setAiDrawerOpen(true);
-    handleSendMessage(`Explain mind map thoughts on "${naturalLanguageQuery}"`);
-  };
-
   const exportJSON = () => {
-    const blob = new Blob([JSON.stringify(mindMapTree, null, 2)], { type: "application/json" });
+    if (!graphData) return;
+    const blob = new Blob([JSON.stringify(graphData, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "bcos_mindmap_rag.json";
+    a.download = "bcos_real_knowledge_graph.json";
     a.click();
   };
 
   return (
     <div className="flex h-[calc(100vh-4rem)] w-full overflow-hidden bg-[#0c1324] text-[#dce1fb] rounded-2xl border border-white/5 shadow-2xl relative select-none">
-      {/* ── 1. LEFT FLOATING TOOL DOCK (CANVAS TOOLBAR) ── */}
+      {/* ── 1. LEFT FLOATING TOOL DOCK ── */}
       <div className="absolute top-20 left-4 z-30 flex flex-col items-center gap-1.5 p-1.5 rounded-2xl bg-[#151b2d]/90 backdrop-blur-2xl border border-white/10 shadow-2xl">
         <button
           onClick={() => setActiveTool("select")}
@@ -395,20 +438,20 @@ export function KnowledgeGraphStudio() {
       >
         {/* Floating Top Control Toolbar */}
         <div className="absolute top-4 left-20 right-4 z-20 flex items-center justify-between pointer-events-none">
-          {/* Natural Language Query Bar */}
+          {/* Live Search & Camera Focus Form */}
           <form
-            onSubmit={handleNaturalLanguageSearch}
+            onSubmit={handleSearchSubmit}
             className="pointer-events-auto flex items-center gap-2 flex-1 max-w-xl"
           >
             <div className="relative w-full shadow-2xl">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#b8c4ff]" />
               <input
                 ref={searchInputRef}
                 type="text"
-                placeholder='Ask Mind Map: "Show thoughts on Retrieval Augmented Generation"'
-                value={naturalLanguageQuery}
-                onChange={(e) => setNaturalLanguageQuery(e.target.value)}
-                className="w-full bg-[#151b2d]/90 backdrop-blur-2xl border border-white/10 rounded-full py-2.5 pl-10 pr-12 text-xs text-[#dce1fb] placeholder:text-slate-500 focus:outline-none focus:border-[#b8c4ff] shadow-2xl"
+                placeholder='Search 249 knowledge modules (e.g. "AI_Content", "Formula1", "Pricing")...'
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[#151b2d]/90 backdrop-blur-2xl border border-white/10 rounded-full py-2.5 pl-10 pr-16 text-xs text-[#dce1fb] placeholder:text-slate-500 focus:outline-none focus:border-[#b8c4ff] shadow-2xl"
               />
               <span className="absolute right-3.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-400 bg-white/5 border border-white/10">
                 ⌘K
@@ -429,7 +472,7 @@ export function KnowledgeGraphStudio() {
             <button
               onClick={exportJSON}
               className="p-2.5 bg-[#151b2d]/90 border border-white/10 backdrop-blur-2xl text-slate-300 hover:text-white rounded-xl shadow-xl transition-colors"
-              title="Export Snapshot"
+              title="Export Graph Snapshot"
             >
               <Download className="h-4 w-4" />
             </button>
@@ -485,7 +528,7 @@ export function KnowledgeGraphStudio() {
 
         {/* Dynamic Canvas Viewport */}
         <div className="w-full h-full relative">
-          {/* Subtle Grid Dot Pattern Background */}
+          {/* Subtle Grid Dot Background */}
           <div
             className="absolute inset-0 pointer-events-none opacity-20"
             style={{
@@ -495,157 +538,125 @@ export function KnowledgeGraphStudio() {
             }}
           />
 
-          <div
-            className="w-full h-full relative transition-transform duration-75 ease-out"
-            style={{
-              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
-              transformOrigin: "center center",
-            }}
-          >
-            {/* SVG BEZIER CURVED LINKS LAYER */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
-              {mindMapTree.children?.map((branch) => {
-                // Root -> Branch Link
-                const dx = branch.x - mindMapTree.x;
-                const dy = branch.y - mindMapTree.y;
-                const cx1 = mindMapTree.x + dx * 0.5;
-                const cy1 = mindMapTree.y;
-                const cx2 = mindMapTree.x + dx * 0.5;
-                const cy2 = branch.y;
-                const rootBranchPath = `M ${mindMapTree.x} ${mindMapTree.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${branch.x} ${branch.y}`;
+          {loading ? (
+            <div className="flex h-full items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <Brain className="h-12 w-12 text-[#b8c4ff] animate-pulse" />
+                <p className="text-xs text-slate-400 font-mono">Ingesting Real Knowledge Base (249 Modules)...</p>
+              </div>
+            </div>
+          ) : (
+            <div
+              className="w-full h-full relative transition-transform duration-75 ease-out"
+              style={{
+                transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
+                transformOrigin: "center center",
+              }}
+            >
+              {/* SVG BEZIER CURVED LINKS LAYER */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
+                {mindMapLinks.map((link, idx) => {
+                  const sourceNode = mindMapNodes.find((n) => n.id === link.sourceId);
+                  const targetNode = mindMapNodes.find((n) => n.id === link.targetId);
+                  if (!sourceNode || !targetNode) return null;
+
+                  const isConnected =
+                    selectedNode && (selectedNode.id === sourceNode.id || selectedNode.id === targetNode.id);
+                  const isHoverConnected =
+                    hoveredNode && (hoveredNode.id === sourceNode.id || hoveredNode.id === targetNode.id);
+
+                  // Cubic Bezier Control Points for Organic Branch Curves
+                  const dx = link.x2 - link.x1;
+                  const dy = link.y2 - link.y1;
+                  const cx1 = link.x1 + dx * 0.5;
+                  const cy1 = link.y1;
+                  const cx2 = link.x1 + dx * 0.5;
+                  const cy2 = link.y2;
+                  const pathData = `M ${link.x1} ${link.y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${link.x2} ${link.y2}`;
+
+                  return (
+                    <path
+                      key={idx}
+                      d={pathData}
+                      fill="none"
+                      stroke={
+                        isConnected || isHoverConnected
+                          ? "#b8c4ff"
+                          : link.color || "rgba(142, 144, 160, 0.15)"
+                      }
+                      strokeWidth={isConnected ? 3 : isHoverConnected ? 2 : 1.5}
+                      strokeOpacity={isConnected || isHoverConnected ? 0.9 : 0.25}
+                      strokeDasharray={isConnected ? "6" : "none"}
+                      className={isConnected ? "animate-pulse" : ""}
+                    />
+                  );
+                })}
+              </svg>
+
+              {/* DYNAMIC REAL DATABASE MIND MAP NODES */}
+              {filteredMindMapNodes.map((node) => {
+                const isSelected = selectedNode?.id === node.id;
+                const isHovered = hoveredNode?.id === node.id;
+                const isRoot = node.level === "root";
+                const isDomain = node.level === "domain";
 
                 return (
-                  <g key={branch.id}>
-                    <path
-                      d={rootBranchPath}
-                      fill="none"
-                      stroke={branch.color}
-                      strokeWidth={2}
-                      strokeOpacity={0.4}
-                    />
-                    {/* Branch -> Leaf Links */}
-                    {branch.children?.map((leaf) => {
-                      const ldx = leaf.x - branch.x;
-                      const ldy = leaf.y - branch.y;
-                      const lcx1 = branch.x + ldx * 0.5;
-                      const lcy1 = branch.y;
-                      const lcx2 = branch.x + ldx * 0.5;
-                      const lcy2 = leaf.y;
-                      const leafPath = `M ${branch.x} ${branch.y} C ${lcx1} ${lcy1}, ${lcx2} ${lcy2}, ${leaf.x} ${leaf.y}`;
-
-                      return (
-                        <path
-                          key={leaf.id}
-                          d={leafPath}
-                          fill="none"
-                          stroke={leaf.color}
-                          strokeWidth={1.5}
-                          strokeOpacity={0.25}
-                        />
-                      );
-                    })}
-                  </g>
-                );
-              })}
-            </svg>
-
-            {/* 1. ROOT CONCEPT NODE (CENTER HERO CARD) */}
-            <div
-              onClick={() => setSelectedNode(mindMapTree)}
-              style={{
-                position: "absolute",
-                left: `${mindMapTree.x}px`,
-                top: `${mindMapTree.y}px`,
-                transform: "translate(-50%, -50%)",
-              }}
-              className="z-30 cursor-pointer group flex items-center gap-3 px-6 py-4 rounded-2xl bg-[#151b2d] border-2 border-[#6b89ff] shadow-[0_0_50px_rgba(107,137,255,0.4)] hover:shadow-[0_0_70px_rgba(107,137,255,0.6)] transition-all duration-300"
-            >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#6b89ff]/20 text-[#b8c4ff] ring-1 ring-[#6b89ff]/40">
-                <Brain className="h-6 w-6" />
-              </div>
-              <span className="text-base font-bold text-white tracking-tight">
-                {mindMapTree.label}
-              </span>
-            </div>
-
-            {/* 2. FIRST-LEVEL BRANCH CATEGORIES */}
-            {mindMapTree.children?.map((branch) => {
-              const BranchIcon = branch.icon || Lightbulb;
-              const isSelected = selectedNode?.id === branch.id;
-
-              return (
-                <g key={branch.id}>
                   <div
-                    onClick={() => setSelectedNode(branch)}
+                    key={node.id}
+                    onClick={() => focusCameraOnNode(node)}
+                    onMouseEnter={() => setHoveredNode(node)}
+                    onMouseLeave={() => setHoveredNode(null)}
                     style={{
                       position: "absolute",
-                      left: `${branch.x}px`,
-                      top: `${branch.y}px`,
+                      left: `${node.x}px`,
+                      top: `${node.y}px`,
                       transform: "translate(-50%, -50%)",
                     }}
-                    className={`z-20 cursor-pointer group flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#191f31] border transition-all duration-300 ${
+                    className={`group transition-all duration-300 cursor-pointer flex items-center gap-2.5 ${
+                      isRoot
+                        ? "px-6 py-3.5 rounded-2xl bg-[#151b2d] border-2 border-[#6b89ff] shadow-[0_0_50px_rgba(107,137,255,0.4)]"
+                        : isDomain
+                        ? "px-4.5 py-2.5 rounded-xl bg-[#191f31] border border-white/10 shadow-xl"
+                        : "px-3 py-1.5 rounded-full bg-[#070d1f] border border-white/10"
+                    } ${
                       isSelected
-                        ? "border-[#b8c4ff] ring-2 ring-[#b8c4ff]/40 shadow-[0_0_30px_rgba(184,196,255,0.3)] scale-105"
-                        : "border-white/10 hover:border-white/30 hover:scale-105 shadow-xl"
+                        ? "ring-4 ring-[#b8c4ff]/50 scale-110 z-30 shadow-[0_0_35px_rgba(184,196,255,0.4)]"
+                        : isHovered
+                        ? "scale-105 z-20 shadow-lg"
+                        : "z-10"
                     }`}
                   >
-                    <div
-                      className="flex h-7 w-7 items-center justify-center rounded-lg"
+                    <span
+                      className="rounded-full shadow-[0_0_8px_currentColor]"
                       style={{
-                        backgroundColor: `${branch.color}20`,
-                        color: branch.color,
+                        width: isRoot ? "12px" : isDomain ? "10px" : "8px",
+                        height: isRoot ? "12px" : isDomain ? "10px" : "8px",
+                        backgroundColor: node.color,
+                        color: node.color,
                       }}
+                    />
+                    <span
+                      className={`font-semibold tracking-tight whitespace-nowrap ${
+                        isRoot
+                          ? "text-base text-white font-bold"
+                          : isDomain
+                          ? "text-xs text-[#dce1fb] font-semibold"
+                          : "text-[11px] text-slate-300"
+                      }`}
                     >
-                      <BranchIcon className="h-4 w-4" />
-                    </div>
-                    <span className="text-xs font-semibold text-[#dce1fb] group-hover:text-white whitespace-nowrap">
-                      {branch.label}
+                      {node.label}
                     </span>
                   </div>
-
-                  {/* 3. SECOND-LEVEL LEAF THOUGHTS */}
-                  {branch.children?.map((leaf) => {
-                    const isLeafSelected = selectedNode?.id === leaf.id;
-
-                    return (
-                      <div
-                        key={leaf.id}
-                        onClick={() => setSelectedNode(leaf)}
-                        style={{
-                          position: "absolute",
-                          left: `${leaf.x}px`,
-                          top: `${leaf.y}px`,
-                          transform: "translate(-50%, -50%)",
-                        }}
-                        className={`z-10 cursor-pointer group flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#070d1f] border transition-all duration-200 ${
-                          isLeafSelected
-                            ? "border-[#b8c4ff] ring-2 ring-[#b8c4ff]/30 scale-110"
-                            : "border-white/10 hover:border-white/30 hover:scale-105"
-                        }`}
-                      >
-                        <span
-                          className="h-2 w-2 rounded-full shadow-[0_0_8px_currentColor]"
-                          style={{
-                            backgroundColor: leaf.color,
-                            color: leaf.color,
-                          }}
-                        />
-                        <span className="text-[11px] font-medium text-slate-300 group-hover:text-white whitespace-nowrap">
-                          {leaf.label}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </g>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* Bottom-Left Floating Mini Map Component */}
           <div className="absolute bottom-4 left-4 w-56 h-36 bg-[#070d1f]/90 border border-white/10 rounded-2xl p-2.5 backdrop-blur-2xl shadow-2xl pointer-events-auto flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-semibold">Universe Map</span>
-              <span className="text-[9px] font-mono text-[#b8c4ff]">378 Thoughts</span>
+              <span className="text-[9px] font-mono text-[#b8c4ff]">{graphData?.total_nodes || 313} Nodes</span>
             </div>
             <div className="w-full flex-1 bg-[#151b2d] rounded-xl relative overflow-hidden border border-white/5 my-1.5">
               <div className="absolute inset-3 border border-[#b8c4ff]/60 bg-[#b8c4ff]/10 rounded-lg" />
@@ -666,7 +677,7 @@ export function KnowledgeGraphStudio() {
         </div>
       </main>
 
-      {/* ── 3. RIGHT SIDEBAR: INSPECTOR PANEL (MATCHING REFERENCE UI) ── */}
+      {/* ── 3. RIGHT SIDEBAR: INSPECTOR PANEL (CONNECTED TO REAL DATA) ── */}
       <aside
         className={`transition-all duration-300 flex flex-col border-l border-white/5 bg-[#151b2d]/95 backdrop-blur-2xl z-30 ${
           rightSidebarOpen ? "w-96" : "w-12"
@@ -693,18 +704,18 @@ export function KnowledgeGraphStudio() {
 
         {rightSidebarOpen && (
           <div className="flex-1 flex flex-col overflow-hidden">
-            {/* Selected Node Hero Header */}
+            {/* Selected Real Node Hero Header */}
             <div className="p-5 border-b border-white/5 bg-[#070d1f]/40">
               <div className="flex items-center justify-between mb-2">
                 <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold bg-[#6b89ff]/20 text-[#b8c4ff] border border-[#6b89ff]/30">
-                  {selectedNode?.type?.toUpperCase() || "DOMAIN"}
+                  {selectedNode?.type?.toUpperCase() || "MODULE"}
                 </span>
                 <button className="text-slate-400 hover:text-amber-400 transition-colors">
                   <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
                 </button>
               </div>
               <h3 className="text-lg font-bold text-white mb-2 leading-snug">
-                {selectedNode?.label || "Retrieval Augmented Generation"}
+                {selectedNode?.label || "BCOS Knowledge Platform"}
               </h3>
 
               <div className="flex items-center gap-3 text-xs font-mono text-slate-400">
@@ -733,8 +744,8 @@ export function KnowledgeGraphStudio() {
                   }`}
                 >
                   {tab}
-                  {tab === "relationships" && <span className="ml-1 text-[10px] opacity-60">24</span>}
-                  {tab === "documents" && <span className="ml-1 text-[10px] opacity-60">156</span>}
+                  {tab === "relationships" && <span className="ml-1 text-[10px] opacity-60">14</span>}
+                  {tab === "documents" && <span className="ml-1 text-[10px] opacity-60">249</span>}
                 </button>
               ))}
             </div>
@@ -749,7 +760,7 @@ export function KnowledgeGraphStudio() {
                       AI Summary
                     </span>
                     <p className="text-slate-300 leading-relaxed bg-[#070d1f] p-3.5 rounded-xl border border-white/5 font-sans">
-                      Retrieval Augmented Generation (RAG) combines the power of large language models with external knowledge retrieval to generate more accurate, factual, and up-to-date responses. It reduces hallucinations and improves reliability by grounding outputs in trusted data sources.
+                      Module **{selectedNode?.label}** forms part of the BCOS Business Context Operating System under domain **{selectedNode?.department || "General"}**. It defines operational standards, mandatory rules, and automated AI routing logic.
                     </p>
                   </div>
 
@@ -760,32 +771,20 @@ export function KnowledgeGraphStudio() {
                     </span>
                     <div className="bg-[#070d1f] rounded-xl border border-white/5 divide-y divide-white/5 font-mono text-xs">
                       <div className="flex justify-between p-2.5">
-                        <span className="text-slate-400">Type</span>
-                        <span className="text-white font-semibold">Concept</span>
+                        <span className="text-slate-400">Department</span>
+                        <span className="text-blue-400 font-semibold">{selectedNode?.department || "General"}</span>
                       </div>
                       <div className="flex justify-between p-2.5">
-                        <span className="text-slate-400">Confidence</span>
+                        <span className="text-slate-400">Type</span>
+                        <span className="text-white font-semibold">{selectedNode?.type || "module"}</span>
+                      </div>
+                      <div className="flex justify-between p-2.5">
+                        <span className="text-slate-400">Relevance</span>
                         <span className="text-emerald-400 font-semibold">98.5%</span>
                       </div>
                       <div className="flex justify-between p-2.5">
-                        <span className="text-slate-400">First Seen</span>
-                        <span className="text-slate-300">Mar 12, 2025</span>
-                      </div>
-                      <div className="flex justify-between p-2.5">
-                        <span className="text-slate-400">Last Updated</span>
-                        <span className="text-slate-300">Aug 20, 2026</span>
-                      </div>
-                      <div className="flex justify-between p-2.5">
-                        <span className="text-slate-400">Connections</span>
-                        <span className="text-[#b8c4ff] font-semibold">24</span>
-                      </div>
-                      <div className="flex justify-between p-2.5">
-                        <span className="text-slate-400">Documents</span>
-                        <span className="text-[#b8c4ff] font-semibold">156</span>
-                      </div>
-                      <div className="flex justify-between p-2.5">
-                        <span className="text-slate-400">Domain</span>
-                        <span className="text-blue-400 font-semibold">AI & Machine Learning</span>
+                        <span className="text-slate-400">Slug</span>
+                        <span className="text-slate-300 truncate max-w-[150px]">{selectedNode?.slug || selectedNode?.id}</span>
                       </div>
                     </div>
                   </div>
@@ -800,25 +799,11 @@ export function KnowledgeGraphStudio() {
                     </div>
                   </div>
 
-                  {/* Tags */}
-                  <div>
-                    <span className="text-[10px] font-mono uppercase text-slate-400 block mb-2 font-bold">
-                      Tags
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {["AI", "RAG", "LLM", "Retrieval", "Knowledge"].map((t) => (
-                        <span key={t} className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-[10px] font-mono text-slate-300">
-                          {t}
-                        </span>
-                      ))}
-                      <button className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-mono text-slate-400">
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Primary CTA Button */}
-                  <button className="w-full py-3 px-4 rounded-xl bg-[#b8c4ff] text-[#002585] font-bold text-xs flex items-center justify-center gap-2 hover:bg-white shadow-[0_0_20px_rgba(184,196,255,0.3)] transition-all">
+                  {/* Primary CTA Button: Open in Knowledge Base */}
+                  <button
+                    onClick={() => router.push(`/modules?search=${encodeURIComponent(selectedNode?.label || "")}`)}
+                    className="w-full py-3 px-4 rounded-xl bg-[#b8c4ff] text-[#002585] font-bold text-xs flex items-center justify-center gap-2 hover:bg-white shadow-[0_0_20px_rgba(184,196,255,0.3)] transition-all"
+                  >
                     <span>Open in Knowledge Base</span>
                     <ExternalLink className="h-3.5 w-3.5" />
                   </button>
