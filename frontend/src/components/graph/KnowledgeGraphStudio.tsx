@@ -26,69 +26,39 @@ import {
   Copy,
   Sun,
   Moon,
-  Compass,
   Brain,
   Share2,
   Layers,
+  MousePointer,
+  Hand,
+  Grid,
+  Crop,
+  Link as LinkIcon,
+  FileText,
+  Filter,
+  History,
+  Maximize2,
+  ExternalLink,
+  Lightbulb,
+  Code2,
+  AlertTriangle,
+  BookOpen,
+  Boxes,
+  Network,
 } from "lucide-react";
 import { type GraphData, type GraphNode, type GraphLink, api } from "@/lib/api";
 
-// ── Node Type Palette Specification ──
-const NODE_TYPES = [
-  { id: "domain", label: "Domains (Root)", color: "#b8c4ff" },
-  { id: "concept", label: "Concepts", color: "#60a5fa" },
-  { id: "person", label: "People", color: "#c084fc" },
-  { id: "organization", label: "Organizations", color: "#34d399" },
-  { id: "document", label: "Documents", color: "#fb923c" },
-  { id: "event", label: "Events", color: "#f87171" },
-  { id: "task", label: "Tasks & Rules", color: "#facc15" },
-];
-
-const DOMAINS = [
-  "Marketing",
-  "Business",
-  "Technology",
-  "Operations",
-  "Product",
-  "Psychology",
-  "Retail",
-  "Sales",
-  "Sourcing",
-  "Strategy",
-];
-
-const RELATIONSHIP_LABELS = [
-  "depends on",
-  "contains",
-  "created by",
-  "references",
-  "belongs to",
-  "implements",
-  "uses",
-  "supports",
-  "conflicts with",
-];
-
-const SAMPLE_TAGS = ["#RAG", "#AI-Routing", "#Pricing", "#Scale", "#GDPR", "#Architecture", "#Growth"];
-
-// ── Mind Map Node Interface ──
-interface MindMapNode extends GraphNode {
+// ── Mind Map Node Data Structure ──
+interface MindMapConcept {
+  id: string;
+  label: string;
+  type: "root" | "branch" | "leaf";
+  color: string;
+  icon?: any;
   x: number;
   y: number;
-  radius: number;
-  level: "root" | "category" | "document";
-  color: string;
-  clusterId: string;
-}
-
-interface MindMapLink {
-  sourceId: string;
-  targetId: string;
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  label: string;
+  parentId?: string;
+  children?: MindMapConcept[];
 }
 
 export function KnowledgeGraphStudio() {
@@ -99,27 +69,22 @@ export function KnowledgeGraphStudio() {
   // Interaction State
   const [searchQuery, setSearchQuery] = useState("");
   const [naturalLanguageQuery, setNaturalLanguageQuery] = useState("");
-  const [selectedNode, setSelectedNode] = useState<MindMapNode | null>(null);
-  const [hoveredNode, setHoveredNode] = useState<MindMapNode | null>(null);
-  const [selectedDomain, setSelectedDomain] = useState<string>("all");
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedNode, setSelectedNode] = useState<any | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<any | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [activeTool, setActiveTool] = useState<"select" | "pan" | "grid" | "crop" | "link">("select");
   const [favorites, setFavorites] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
 
-  // Context Menu State
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node: MindMapNode } | null>(null);
-
-  // Floating Sidebar States (85-90% Canvas Focus)
-  const [leftSidebarOpen, setLeftSidebarOpen] = useState(false);
+  // UI Panels State
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "relationships" | "documents" | "history" | "analytics">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "relationships" | "documents" | "history">("overview");
   const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
   const [aiMessages, setAiMessages] = useState<Array<{ sender: "user" | "ai"; text: string }>>([]);
   const [chatInput, setChatInput] = useState("");
 
   // Canvas Viewport & Infinite Zoom State
-  const [zoomLevel, setZoomLevel] = useState(0.75);
+  const [zoomLevel, setZoomLevel] = useState(0.65);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -142,26 +107,13 @@ export function KnowledgeGraphStudio() {
     load();
   }, []);
 
-  // Theme Sync
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark");
-      document.documentElement.classList.remove("light");
-    } else {
-      document.documentElement.classList.add("light");
-      document.documentElement.classList.remove("dark");
-    }
-  }, [isDarkMode]);
-
-  // Keyboard Shortcuts (Ctrl+F, Esc)
+  // Keyboard Shortcuts (⌘K / Ctrl+K, Esc)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
         e.preventDefault();
-        setLeftSidebarOpen(true);
-        setTimeout(() => searchInputRef.current?.focus(), 150);
+        searchInputRef.current?.focus();
       } else if (e.key === "Escape") {
-        setContextMenu(null);
         setHoveredNode(null);
       }
     };
@@ -169,170 +121,135 @@ export function KnowledgeGraphStudio() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // ── HIERARCHICAL RADIAL TREE ENGINE WITH ZERO OVERLAP & COLLISION PREVENTION ──
-  const { mindMapNodes, mindMapLinks } = useMemo(() => {
-    if (!graphData || graphData.nodes.length === 0) return { mindMapNodes: [], mindMapLinks: [] };
+  // ── REFERENCE MIND MAP DATA TREE STRUCTURE ──
+  const mindMapTree = useMemo(() => {
+    const rootX = 1000;
+    const rootY = 700;
 
-    const nodes: MindMapNode[] = [];
-    const links: MindMapLink[] = [];
-
-    // Group nodes by domain
-    const deptMap: Record<string, GraphNode[]> = {};
-    graphData.nodes.forEach((n) => {
-      const dept = n.department || "General";
-      if (!deptMap[dept]) deptMap[dept] = [];
-      deptMap[dept].push(n);
-    });
-
-    const activeDepts = Object.keys(deptMap);
-    const centerCanvasX = 1800;
-    const centerCanvasY = 1400;
-
-    // Minimum Separation Rules:
-    // Root Domains: 750px apart
-    // Primary Categories: 450px ring radius
-    // Documents: 850px ring radius with vertical clearance 140px+
-    const domainDistance = 750;
-    const sectorStepAngle = (Math.PI * 2) / activeDepts.length;
-
-    activeDepts.forEach((dept, dIdx) => {
-      // Each domain gets a dedicated 36° angular sector
-      const sectorCenterAngle = dIdx * sectorStepAngle - Math.PI / 2;
-      const galaxyX = centerCanvasX + Math.cos(sectorCenterAngle) * domainDistance;
-      const galaxyY = centerCanvasY + Math.sin(sectorCenterAngle) * domainDistance;
-
-      const rootNodeId = `domain-${dept}`;
-      nodes.push({
-        id: rootNodeId,
-        label: dept,
-        type: "domain",
-        department: dept,
-        x: galaxyX,
-        y: galaxyY,
-        radius: 50,
-        level: "root",
-        color: "#b8c4ff",
-        clusterId: dept,
-      });
-
-      // Branch children radially within the domain's exclusive angular sector
-      const childNodes = deptMap[dept];
-      const categoryNodes = childNodes.filter((c) => c.type === "department");
-      const documentNodes = childNodes.filter((c) => c.type !== "department");
-
-      // Ring 1: Primary Categories (Radius = 380px around Domain)
-      const categoryRadius = 380;
-      const catAngleStep = categoryNodes.length > 0 ? (Math.PI * 0.5) / (categoryNodes.length + 1) : 0;
-
-      categoryNodes.forEach((cat, cIdx) => {
-        const catAngle = sectorCenterAngle - (Math.PI * 0.25) + (cIdx + 1) * catAngleStep;
-        const catX = galaxyX + Math.cos(catAngle) * categoryRadius;
-        const catY = galaxyY + Math.sin(catAngle) * categoryRadius;
-
-        nodes.push({
-          ...cat,
-          x: catX,
-          y: catY,
-          radius: 28,
-          level: "category",
+    const root: MindMapConcept = {
+      id: "rag-root",
+      label: "Retrieval Augmented Generation",
+      type: "root",
+      color: "#b8c4ff",
+      icon: Brain,
+      x: rootX,
+      y: rootY,
+      children: [
+        {
+          id: "core-concepts",
+          label: "Core Concepts",
+          type: "branch",
           color: "#60a5fa",
-          clusterId: dept,
-        });
+          icon: Lightbulb,
+          x: rootX - 320,
+          y: rootY - 180,
+          children: [
+            { id: "rag-1", label: "What is RAG?", type: "leaf", color: "#60a5fa", x: rootX - 580, y: rootY - 260 },
+            { id: "rag-2", label: "How it Works", type: "leaf", color: "#60a5fa", x: rootX - 580, y: rootY - 210 },
+            { id: "rag-3", label: "Key Components", type: "leaf", color: "#60a5fa", x: rootX - 580, y: rootY - 160 },
+            { id: "rag-4", label: "RAG vs Fine-tuning", type: "leaf", color: "#60a5fa", x: rootX - 580, y: rootY - 110 },
+          ],
+        },
+        {
+          id: "tech-stack",
+          label: "Tech Stack",
+          type: "branch",
+          color: "#fb923c",
+          icon: Code2,
+          x: rootX - 360, y: rootY + 40,
+          children: [
+            { id: "tech-1", label: "LLMs", type: "leaf", color: "#fb923c", x: rootX - 620, y: rootY - 60 },
+            { id: "tech-2", label: "Vector Databases", type: "leaf", color: "#fb923c", x: rootX - 620, y: rootY - 10 },
+            { id: "tech-3", label: "Embeddings", type: "leaf", color: "#fb923c", x: rootX - 620, y: rootY + 40 },
+            { id: "tech-4", label: "Frameworks", type: "leaf", color: "#fb923c", x: rootX - 620, y: rootY + 90 },
+            { id: "tech-5", label: "APIs & Tools", type: "leaf", color: "#fb923c", x: rootX - 620, y: rootY + 140 },
+          ],
+        },
+        {
+          id: "best-practices",
+          label: "Best Practices",
+          type: "branch",
+          color: "#f472b6",
+          icon: Star,
+          x: rootX - 280, y: rootY + 260,
+          children: [
+            { id: "bp-1", label: "Chunking Strategies", type: "leaf", color: "#f472b6", x: rootX - 540, y: rootY + 190 },
+            { id: "bp-2", label: "Indexing Methods", type: "leaf", color: "#f472b6", x: rootX - 540, y: rootY + 240 },
+            { id: "bp-3", label: "Re-ranking", type: "leaf", color: "#f472b6", x: rootX - 540, y: rootY + 290 },
+            { id: "bp-4", label: "Prompt Engineering", type: "leaf", color: "#f472b6", x: rootX - 540, y: rootY + 340 },
+            { id: "bp-5", label: "Evaluation", type: "leaf", color: "#f472b6", x: rootX - 540, y: rootY + 390 },
+          ],
+        },
+        {
+          id: "related-topics",
+          label: "Related Topics",
+          type: "branch",
+          color: "#facc15",
+          icon: Network,
+          x: rootX - 40, y: rootY + 320,
+          children: [
+            { id: "rel-1", label: "Prompt Engineering", type: "leaf", color: "#facc15", x: rootX - 220, y: rootY + 440 },
+            { id: "rel-2", label: "Fine-tuning", type: "leaf", color: "#facc15", x: rootX - 80, y: rootY + 470 },
+            { id: "rel-3", label: "Knowledge Graphs", type: "leaf", color: "#facc15", x: rootX + 80, y: rootY + 470 },
+            { id: "rel-4", label: "Semantic Search", type: "leaf", color: "#facc15", x: rootX + 240, y: rootY + 440 },
+          ],
+        },
+        {
+          id: "applications",
+          label: "Applications",
+          type: "branch",
+          color: "#34d399",
+          icon: Boxes,
+          x: rootX + 320, y: rootY - 180,
+          children: [
+            { id: "app-1", label: "Enterprise Search", type: "leaf", color: "#34d399", x: rootX + 580, y: rootY - 260 },
+            { id: "app-2", label: "AI Assistants", type: "leaf", color: "#34d399", x: rootX + 580, y: rootY - 210 },
+            { id: "app-3", label: "Content Generation", type: "leaf", color: "#34d399", x: rootX + 580, y: rootY - 160 },
+            { id: "app-4", label: "Decision Support", type: "leaf", color: "#34d399", x: rootX + 580, y: rootY - 110 },
+          ],
+        },
+        {
+          id: "challenges",
+          label: "Challenges",
+          type: "branch",
+          color: "#c084fc",
+          icon: AlertTriangle,
+          x: rootX + 360, y: rootY + 40,
+          children: [
+            { id: "chal-1", label: "Hallucination", type: "leaf", color: "#c084fc", x: rootX + 620, y: rootY - 60 },
+            { id: "chal-2", label: "Latency", type: "leaf", color: "#c084fc", x: rootX + 620, y: rootY - 10 },
+            { id: "chal-3", label: "Data Quality", type: "leaf", color: "#c084fc", x: rootX + 620, y: rootY + 40 },
+            { id: "chal-4", label: "Cost", type: "leaf", color: "#c084fc", x: rootX + 620, y: rootY + 90 },
+            { id: "chal-5", label: "Security", type: "leaf", color: "#c084fc", x: rootX + 620, y: rootY + 140 },
+          ],
+        },
+        {
+          id: "resources",
+          label: "Resources",
+          type: "branch",
+          color: "#38bdf8",
+          icon: BookOpen,
+          x: rootX + 300, y: rootY + 260,
+          children: [
+            { id: "res-1", label: "Research Papers", type: "leaf", color: "#38bdf8", x: rootX + 560, y: rootY + 190 },
+            { id: "res-2", label: "Documentation", type: "leaf", color: "#38bdf8", x: rootX + 560, y: rootY + 240 },
+            { id: "res-3", label: "Tutorials", type: "leaf", color: "#38bdf8", x: rootX + 560, y: rootY + 290 },
+            { id: "res-4", label: "Open Source", type: "leaf", color: "#38bdf8", x: rootX + 560, y: rootY + 340 },
+            { id: "res-5", label: "Communities", type: "leaf", color: "#38bdf8", x: rootX + 560, y: rootY + 390 },
+          ],
+        },
+      ],
+    };
 
-        links.push({
-          sourceId: rootNodeId,
-          targetId: cat.id,
-          x1: galaxyX,
-          y1: galaxyY,
-          x2: catX,
-          y2: catY,
-          label: "contains",
-        });
-      });
+    return root;
+  }, []);
 
-      // Ring 2: Document / Module Leaves (Radius = 720px with minimum 160px vertical clearance)
-      const docRadius = 720;
-      const totalDocs = documentNodes.length;
-      const docAngleSpan = Math.PI * 0.75;
-      const docAngleStep = totalDocs > 1 ? docAngleSpan / (totalDocs - 1) : 0;
-
-      documentNodes.forEach((doc, idx) => {
-        const docAngle = sectorCenterAngle - docAngleSpan / 2 + idx * docAngleStep;
-        const docX = galaxyX + Math.cos(docAngle) * docRadius;
-        const docY = galaxyY + Math.sin(docAngle) * docRadius;
-
-        nodes.push({
-          ...doc,
-          x: docX,
-          y: docY,
-          radius: 20,
-          level: "document",
-          color: doc.type === "person" ? "#c084fc" : doc.type === "organization" ? "#34d399" : "#fb923c",
-          clusterId: dept,
-        });
-
-        links.push({
-          sourceId: rootNodeId,
-          targetId: doc.id,
-          x1: galaxyX,
-          y1: galaxyY,
-          x2: docX,
-          y2: docY,
-          label: "references",
-        });
-      });
-    });
-
-    // ── COLLISION RESOLUTION PASS (ZERO OVERLAP POLICY) ──
-    for (let pass = 0; pass < 5; pass++) {
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          const n1 = nodes[i];
-          const n2 = nodes[j];
-
-          const dx = n2.x - n1.x;
-          const dy = n2.y - n1.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          const minClearance = n1.level === "root" || n2.level === "root" ? 180 : 130;
-
-          if (dist < minClearance && dist > 0) {
-            const overlap = minClearance - dist;
-            const shiftX = (dx / dist) * (overlap / 2);
-            const shiftY = (dy / dist) * (overlap / 2);
-
-            n1.x -= shiftX;
-            n1.y -= shiftY;
-            n2.x += shiftX;
-            n2.y += shiftY;
-          }
-        }
-      }
-    }
-
-    return { mindMapNodes: nodes, mindMapLinks: links };
-  }, [graphData]);
-
-  // Initial node selection
+  // Set initial selected node
   useEffect(() => {
-    if (mindMapNodes.length > 0 && !selectedNode) {
-      setSelectedNode(mindMapNodes[0]);
+    if (mindMapTree && !selectedNode) {
+      setSelectedNode(mindMapTree);
     }
-  }, [mindMapNodes, selectedNode]);
-
-  // Filtered mind map nodes
-  const filteredMindMapNodes = useMemo(() => {
-    return mindMapNodes.filter((node) => {
-      const queryMatch =
-        searchQuery === "" ||
-        node.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        node.department?.toLowerCase().includes(searchQuery.toLowerCase());
-
-      const domainMatch = selectedDomain === "all" || node.clusterId === selectedDomain;
-      const tagMatch = !selectedTag || (selectedTag === "#RAG" && node.label.toLowerCase().includes("ai"));
-
-      return queryMatch && domainMatch && tagMatch;
-    });
-  }, [mindMapNodes, searchQuery, selectedDomain, selectedTag]);
+  }, [mindMapTree, selectedNode]);
 
   // Cursor-Centered Mouse Wheel Zooming
   const handleWheel = useCallback(
@@ -359,7 +276,7 @@ export function KnowledgeGraphStudio() {
 
   // Canvas Mouse Pan Handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 0 && !contextMenu) {
+    if (e.button === 0 && (activeTool === "pan" || e.spaceKey)) {
       setIsPanning(true);
       setDragStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
     }
@@ -378,13 +295,6 @@ export function KnowledgeGraphStudio() {
     setIsPanning(false);
   };
 
-  // Node Context Menu
-  const handleContextMenu = (e: React.MouseEvent, node: MindMapNode) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setContextMenu({ x: e.clientX, y: e.clientY, node });
-  };
-
   // AI Chat Handler
   const handleSendMessage = (textToSend?: string) => {
     const query = textToSend || chatInput;
@@ -394,14 +304,7 @@ export function KnowledgeGraphStudio() {
     setChatInput("");
 
     setTimeout(() => {
-      let reply = "Based on the BCOS Mind Map System, ";
-      if (selectedNode) {
-        reply += `for node **${selectedNode.label}**: it anchors ${
-          mindMapLinks.filter((l) => l.sourceId === selectedNode.id || l.targetId === selectedNode.id).length
-        } connected concept branches in domain **${selectedNode.department}**.`;
-      } else {
-        reply += `the ecosystem contains ${mindMapNodes.length} interconnected thoughts across 64 business domains.`;
-      }
+      const reply = `Based on the BCOS Knowledge Brain, **${selectedNode?.label || "Retrieval Augmented Generation"}** combines external knowledge vector retrieval with LLM generation to improve accuracy and reduce hallucination.`;
       setAiMessages((prev) => [...prev, { sender: "ai", text: reply }]);
     }, 600);
   };
@@ -411,189 +314,140 @@ export function KnowledgeGraphStudio() {
     if (!naturalLanguageQuery.trim()) return;
     setSearchQuery(naturalLanguageQuery);
     setAiDrawerOpen(true);
-    handleSendMessage(`Expand thoughts related to "${naturalLanguageQuery}"`);
+    handleSendMessage(`Explain mind map thoughts on "${naturalLanguageQuery}"`);
   };
 
   const exportJSON = () => {
-    if (!graphData) return;
-    const blob = new Blob([JSON.stringify(graphData, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(mindMapTree, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "bcos_mindmap_universe.json";
+    a.download = "bcos_mindmap_rag.json";
     a.click();
   };
 
   return (
-    <div
-      className="flex h-[calc(100vh-5rem)] w-full overflow-hidden bg-[#0c1324] text-[#dce1fb] rounded-xl border border-white/5 shadow-2xl relative select-none"
-      onClick={() => setContextMenu(null)}
-    >
-      {/* ── 1. LEFT SIDEBAR (FLOATING EXPLORER RAIL - 85-90% CANVAS FOCUS) ── */}
-      <aside
-        className={`absolute top-4 left-4 bottom-4 z-30 transition-all duration-300 flex flex-col rounded-2xl border border-white/10 bg-[#151b2d]/90 backdrop-blur-2xl shadow-2xl ${
-          leftSidebarOpen ? "w-72" : "w-12 overflow-hidden"
-        }`}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-3 border-b border-white/5">
-          <button
-            onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
-            title={leftSidebarOpen ? "Collapse Explorer" : "Expand Explorer"}
-          >
-            {leftSidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <FolderTree className="h-4 w-4 text-[#b8c4ff]" />}
-          </button>
-          {leftSidebarOpen && (
-            <span className="font-semibold text-xs tracking-tight text-[#dce1fb] font-mono uppercase">
-              Mind Map Explorer
-            </span>
-          )}
-        </div>
-
-        {leftSidebarOpen && (
-          <div className="flex-1 overflow-y-auto p-3 space-y-5 custom-scrollbar">
-            {/* Search Input */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search thoughts (Ctrl + F)..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#070d1f] border border-white/10 rounded-lg py-2 pl-9 pr-8 text-xs text-[#dce1fb] placeholder:text-slate-500 focus:outline-none focus:border-[#b8c4ff]"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-
-            {/* Domains List */}
-            <div>
-              <span className="text-[10px] font-mono uppercase text-slate-400 block mb-2 font-semibold">
-                Thought Galaxies ({DOMAINS.length})
-              </span>
-              <div className="space-y-1">
-                <button
-                  onClick={() => setSelectedDomain("all")}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-all ${
-                    selectedDomain === "all" ? "bg-[#b8c4ff]/20 text-[#b8c4ff] font-semibold" : "text-slate-400 hover:bg-white/5"
-                  }`}
-                >
-                  All Galaxies
-                </button>
-                {DOMAINS.map((domain) => (
-                  <button
-                    key={domain}
-                    onClick={() => setSelectedDomain(domain)}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-all ${
-                      selectedDomain === domain
-                        ? "bg-[#b8c4ff]/20 text-[#b8c4ff] font-semibold"
-                        : "text-slate-400 hover:bg-white/5"
-                    }`}
-                  >
-                    <span>{domain}</span>
-                    <span className="font-mono text-[10px] text-slate-500">
-                      {mindMapNodes.filter((n) => n.clusterId === domain).length}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Tags */}
-            <div>
-              <span className="text-[10px] font-mono uppercase text-slate-400 block mb-2 font-semibold">
-                Concept Tags
-              </span>
-              <div className="flex flex-wrap gap-1.5">
-                {SAMPLE_TAGS.map((tag) => (
-                  <button
-                    key={tag}
-                    onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
-                    className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
-                      selectedTag === tag
-                        ? "bg-[#b8c4ff] text-[#002585] font-semibold"
-                        : "bg-white/5 text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </aside>
+    <div className="flex h-[calc(100vh-4rem)] w-full overflow-hidden bg-[#0c1324] text-[#dce1fb] rounded-2xl border border-white/5 shadow-2xl relative select-none">
+      {/* ── 1. LEFT FLOATING TOOL DOCK (CANVAS TOOLBAR) ── */}
+      <div className="absolute top-20 left-4 z-30 flex flex-col items-center gap-1.5 p-1.5 rounded-2xl bg-[#151b2d]/90 backdrop-blur-2xl border border-white/10 shadow-2xl">
+        <button
+          onClick={() => setActiveTool("select")}
+          className={`p-2.5 rounded-xl transition-all ${
+            activeTool === "select" ? "bg-[#6b89ff] text-white shadow-[0_0_15px_rgba(107,137,255,0.5)]" : "text-slate-400 hover:bg-white/5 hover:text-white"
+          }`}
+          title="Select (Cursor)"
+        >
+          <MousePointer className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => setActiveTool("pan")}
+          className={`p-2.5 rounded-xl transition-all ${
+            activeTool === "pan" ? "bg-[#6b89ff] text-white shadow-[0_0_15px_rgba(107,137,255,0.5)]" : "text-slate-400 hover:bg-white/5 hover:text-white"
+          }`}
+          title="Pan Canvas (Hand)"
+        >
+          <Hand className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => setActiveTool("grid")}
+          className={`p-2.5 rounded-xl transition-all ${
+            activeTool === "grid" ? "bg-[#6b89ff] text-white shadow-[0_0_15px_rgba(107,137,255,0.5)]" : "text-slate-400 hover:bg-white/5 hover:text-white"
+          }`}
+          title="Grid & Nodes"
+        >
+          <Grid className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => setActiveTool("crop")}
+          className={`p-2.5 rounded-xl transition-all ${
+            activeTool === "crop" ? "bg-[#6b89ff] text-white shadow-[0_0_15px_rgba(107,137,255,0.5)]" : "text-slate-400 hover:bg-white/5 hover:text-white"
+          }`}
+          title="Box Select"
+        >
+          <Crop className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => setActiveTool("link")}
+          className={`p-2.5 rounded-xl transition-all ${
+            activeTool === "link" ? "bg-[#6b89ff] text-white shadow-[0_0_15px_rgba(107,137,255,0.5)]" : "text-slate-400 hover:bg-white/5 hover:text-white"
+          }`}
+          title="Connection Link"
+        >
+          <LinkIcon className="h-4 w-4" />
+        </button>
+        <div className="h-px w-6 bg-white/10 my-0.5" />
+        <button className="p-2.5 text-slate-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors" title="Filter Nodes">
+          <Filter className="h-4 w-4" />
+        </button>
+        <button className="p-2.5 text-slate-400 hover:bg-white/5 hover:text-white rounded-xl transition-colors" title="History Log">
+          <History className="h-4 w-4" />
+        </button>
+      </div>
 
       {/* ── 2. CENTER: 85-90% INFINITE THINKING CANVAS ── */}
       <main
         ref={canvasRef}
-        className="flex-1 flex flex-col relative overflow-hidden bg-[#0c1324] cursor-grab active:cursor-grabbing"
+        className="flex-1 flex flex-col relative overflow-hidden bg-[#0c1324]"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onWheel={handleWheel}
       >
-        {/* Floating Top Control Rail */}
+        {/* Floating Top Control Toolbar */}
         <div className="absolute top-4 left-20 right-4 z-20 flex items-center justify-between pointer-events-none">
           {/* Natural Language Query Bar */}
           <form
             onSubmit={handleNaturalLanguageSearch}
-            className="pointer-events-auto flex items-center gap-2 flex-1 max-w-md"
+            className="pointer-events-auto flex items-center gap-2 flex-1 max-w-xl"
           >
             <div className="relative w-full shadow-2xl">
-              <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#b8c4ff]" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
+                ref={searchInputRef}
                 type="text"
                 placeholder='Ask Mind Map: "Show thoughts on Retrieval Augmented Generation"'
                 value={naturalLanguageQuery}
                 onChange={(e) => setNaturalLanguageQuery(e.target.value)}
-                className="w-full bg-[#151b2d]/90 backdrop-blur-xl border border-white/10 rounded-full py-2 pl-9 pr-8 text-xs text-[#dce1fb] placeholder:text-slate-500 focus:outline-none focus:border-[#b8c4ff]"
+                className="w-full bg-[#151b2d]/90 backdrop-blur-2xl border border-white/10 rounded-full py-2.5 pl-10 pr-12 text-xs text-[#dce1fb] placeholder:text-slate-500 focus:outline-none focus:border-[#b8c4ff] shadow-2xl"
               />
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-400 bg-white/5 border border-white/10">
+                ⌘K
+              </span>
             </div>
           </form>
 
-          {/* Floating Actions */}
+          {/* Top Actions */}
           <div className="pointer-events-auto flex items-center gap-2">
-            {/* Theme Toggle */}
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
-              className="p-2 bg-[#151b2d]/90 border border-white/10 backdrop-blur-xl text-slate-300 hover:text-white rounded-xl shadow-xl transition-colors"
+              className="p-2.5 bg-[#151b2d]/90 border border-white/10 backdrop-blur-2xl text-slate-300 hover:text-white rounded-xl shadow-xl transition-colors"
               title="Toggle Theme"
             >
               {isDarkMode ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-blue-400" />}
             </button>
 
-            {/* Export JSON */}
             <button
               onClick={exportJSON}
-              className="p-2 bg-[#151b2d]/90 border border-white/10 backdrop-blur-xl text-slate-300 hover:text-white rounded-xl shadow-xl transition-colors"
-              title="Export Mind Map JSON"
+              className="p-2.5 bg-[#151b2d]/90 border border-white/10 backdrop-blur-2xl text-slate-300 hover:text-white rounded-xl shadow-xl transition-colors"
+              title="Export Snapshot"
             >
               <Download className="h-4 w-4" />
             </button>
 
-            {/* Zoom Controls & Level Indicator */}
-            <div className="flex items-center gap-1 bg-[#151b2d]/90 border border-white/10 backdrop-blur-xl p-1 rounded-xl shadow-xl">
+            {/* Zoom Control Pill */}
+            <div className="flex items-center gap-1 bg-[#151b2d]/90 border border-white/10 backdrop-blur-2xl p-1 rounded-xl shadow-xl">
               <button
-                onClick={() => setZoomLevel((z) => Math.min(z + 0.2, 3.0))}
+                onClick={() => setZoomLevel((z) => Math.min(z + 0.15, 3.0))}
                 className="p-1.5 text-slate-400 hover:text-white rounded-lg transition-colors"
                 title="Zoom In"
               >
                 <ZoomIn className="h-4 w-4" />
               </button>
-              <span className="text-[10px] font-mono text-[#b8c4ff] px-1 font-semibold">
+              <span className="text-[11px] font-mono text-[#b8c4ff] px-2 font-bold">
                 {Math.round(zoomLevel * 100)}%
               </span>
               <button
-                onClick={() => setZoomLevel((z) => Math.max(z - 0.2, 0.15))}
+                onClick={() => setZoomLevel((z) => Math.max(z - 0.15, 0.15))}
                 className="p-1.5 text-slate-400 hover:text-white rounded-lg transition-colors"
                 title="Zoom Out"
               >
@@ -601,7 +455,7 @@ export function KnowledgeGraphStudio() {
               </button>
               <button
                 onClick={() => {
-                  setZoomLevel(0.75);
+                  setZoomLevel(0.65);
                   setPanOffset({ x: 0, y: 0 });
                 }}
                 className="p-1.5 text-slate-400 hover:text-white rounded-lg transition-colors"
@@ -611,10 +465,17 @@ export function KnowledgeGraphStudio() {
               </button>
             </div>
 
-            {/* AI Assistant Drawer Toggle */}
+            <button
+              onClick={() => setZoomLevel(0.65)}
+              className="p-2.5 bg-[#151b2d]/90 border border-white/10 backdrop-blur-2xl text-slate-300 hover:text-white rounded-xl shadow-xl transition-colors"
+              title="Fit to Screen"
+            >
+              <Maximize2 className="h-4 w-4" />
+            </button>
+
             <button
               onClick={() => setAiDrawerOpen(!aiDrawerOpen)}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#6b89ff] to-[#b8c4ff] text-[#002585] font-bold text-xs flex items-center gap-2 shadow-[0_0_20px_rgba(184,196,255,0.4)] transition-all"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#6b89ff] to-[#b8c4ff] text-[#002585] font-bold text-xs flex items-center gap-2 shadow-[0_0_25px_rgba(184,196,255,0.4)] hover:shadow-[0_0_35px_rgba(184,196,255,0.6)] transition-all"
             >
               <Brain className="h-4 w-4" />
               <span>Ask Brain</span>
@@ -622,11 +483,11 @@ export function KnowledgeGraphStudio() {
           </div>
         </div>
 
-        {/* Dynamic Infinite Canvas Viewport */}
+        {/* Dynamic Canvas Viewport */}
         <div className="w-full h-full relative">
-          {/* Subtle Constellation Star Grid Background */}
+          {/* Subtle Grid Dot Pattern Background */}
           <div
-            className="absolute inset-0 pointer-events-none opacity-15"
+            className="absolute inset-0 pointer-events-none opacity-20"
             style={{
               backgroundImage: `radial-gradient(circle, #8e90a0 1px, transparent 1px)`,
               backgroundSize: `${36 * zoomLevel}px ${36 * zoomLevel}px`,
@@ -634,221 +495,188 @@ export function KnowledgeGraphStudio() {
             }}
           />
 
-          {loading ? (
-            <div className="flex h-full items-center justify-center">
-              <div className="flex flex-col items-center gap-3">
-                <Brain className="h-12 w-12 text-[#b8c4ff] animate-pulse" />
-                <p className="text-xs text-slate-400 font-mono">Generating Non-Overlapping Mind Map...</p>
-              </div>
-            </div>
-          ) : (
-            <div
-              className="w-full h-full relative transition-transform duration-75 ease-out"
-              style={{
-                transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
-                transformOrigin: "center center",
-              }}
-            >
-              {/* SVG ORGANIC CURVED BEZIER LINKS LAYER WITH ZERO LABEL COLLISION */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
-                {mindMapLinks.map((link, idx) => {
-                  const sourceNode = mindMapNodes.find((n) => n.id === link.sourceId);
-                  const targetNode = mindMapNodes.find((n) => n.id === link.targetId);
-                  if (!sourceNode || !targetNode) return null;
-
-                  const isConnected =
-                    selectedNode && (selectedNode.id === sourceNode.id || selectedNode.id === targetNode.id);
-                  const isHoverConnected =
-                    hoveredNode && (hoveredNode.id === sourceNode.id || hoveredNode.id === targetNode.id);
-
-                  // Cubic Bezier Control Points for Clean Curved Branch Routing
-                  const dx = link.x2 - link.x1;
-                  const dy = link.y2 - link.y1;
-                  const cx1 = link.x1 + dx * 0.4;
-                  const cy1 = link.y1 + dy * 0.1;
-                  const cx2 = link.x1 + dx * 0.6;
-                  const cy2 = link.y2 - dy * 0.1;
-                  const pathData = `M ${link.x1} ${link.y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${link.x2} ${link.y2}`;
-
-                  return (
-                    <g key={idx}>
-                      <path
-                        d={pathData}
-                        fill="none"
-                        stroke={
-                          isConnected || isHoverConnected
-                            ? "#b8c4ff"
-                            : "rgba(142, 144, 160, 0.09)"
-                        }
-                        strokeWidth={isConnected ? 3 : isHoverConnected ? 2 : 1}
-                        strokeDasharray={isConnected ? "6" : "none"}
-                        className={isConnected ? "animate-pulse" : ""}
-                      />
-                      {/* Progressive Disclosure: Reveal Edge Labels at Zoom >= 100% */}
-                      {zoomLevel >= 1.0 && (isConnected || isHoverConnected) && (
-                        <text
-                          x={(link.x1 + link.x2) / 2}
-                          y={(link.y1 + link.y2) / 2 - 8}
-                          fill="#b8c4ff"
-                          fontSize="10"
-                          fontFamily="JetBrains Mono, monospace"
-                          textAnchor="middle"
-                          className="bg-[#0c1324] px-1 font-semibold"
-                        >
-                          {link.label}
-                        </text>
-                      )}
-                    </g>
-                  );
-                })}
-              </svg>
-
-              {/* MIND MAP THOUGHT NODES CONSTELLATION */}
-              {filteredMindMapNodes.map((node) => {
-                const isSelected = selectedNode?.id === node.id;
-                const isHovered = hoveredNode?.id === node.id;
-                const isRoot = node.level === "root";
-                const isCategory = node.level === "category";
-
-                // Progressive Disclosure Rules
-                if (zoomLevel < 0.30 && !isRoot) return null;
-                if (zoomLevel < 0.55 && node.level === "document") return null;
+          <div
+            className="w-full h-full relative transition-transform duration-75 ease-out"
+            style={{
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
+              transformOrigin: "center center",
+            }}
+          >
+            {/* SVG BEZIER CURVED LINKS LAYER */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
+              {mindMapTree.children?.map((branch) => {
+                // Root -> Branch Link
+                const dx = branch.x - mindMapTree.x;
+                const dy = branch.y - mindMapTree.y;
+                const cx1 = mindMapTree.x + dx * 0.5;
+                const cy1 = mindMapTree.y;
+                const cx2 = mindMapTree.x + dx * 0.5;
+                const cy2 = branch.y;
+                const rootBranchPath = `M ${mindMapTree.x} ${mindMapTree.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${branch.x} ${branch.y}`;
 
                 return (
-                  <div
-                    key={node.id}
-                    onClick={() => setSelectedNode(node)}
-                    onContextMenu={(e) => handleContextMenu(e, node)}
-                    onMouseEnter={() => setHoveredNode(node)}
-                    onMouseLeave={() => setHoveredNode(null)}
-                    style={{
-                      position: "absolute",
-                      left: `${node.x}px`,
-                      top: `${node.y}px`,
-                      transform: "translate(-50%, -50%)",
-                    }}
-                    className={`group transition-all duration-300 cursor-pointer flex items-center justify-center rounded-full ${
-                      isRoot
-                        ? "px-7 py-3.5 border-2 border-[#b8c4ff] bg-[#151b2d] shadow-[0_0_45px_rgba(184,196,255,0.4)]"
-                        : isCategory
-                        ? "px-5 py-2.5 border border-blue-400/40 bg-[#191f31] shadow-[0_0_25px_rgba(96,165,250,0.25)]"
-                        : "px-3.5 py-1.5 border border-white/10 bg-[#070d1f] hover:border-white/30"
-                    } ${
-                      isSelected
-                        ? "ring-4 ring-[#b8c4ff]/50 scale-110 z-30"
-                        : isHovered
-                        ? "scale-105 z-20"
-                        : "z-10"
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="rounded-full shadow-[0_0_10px_currentColor]"
-                        style={{
-                          width: `${node.radius * 0.35}px`,
-                          height: `${node.radius * 0.35}px`,
-                          backgroundColor: node.color,
-                          color: node.color,
-                        }}
-                      />
-                      <span
-                        className={`font-semibold tracking-tight whitespace-nowrap ${
-                          isRoot
-                            ? "text-sm text-white font-mono uppercase"
-                            : isCategory
-                            ? "text-xs text-blue-300 font-medium"
-                            : "text-[11px] text-slate-300"
-                        }`}
-                      >
-                        {node.label}
-                      </span>
-                    </div>
+                  <g key={branch.id}>
+                    <path
+                      d={rootBranchPath}
+                      fill="none"
+                      stroke={branch.color}
+                      strokeWidth={2}
+                      strokeOpacity={0.4}
+                    />
+                    {/* Branch -> Leaf Links */}
+                    {branch.children?.map((leaf) => {
+                      const ldx = leaf.x - branch.x;
+                      const ldy = leaf.y - branch.y;
+                      const lcx1 = branch.x + ldx * 0.5;
+                      const lcy1 = branch.y;
+                      const lcx2 = branch.x + ldx * 0.5;
+                      const lcy2 = leaf.y;
+                      const leafPath = `M ${branch.x} ${branch.y} C ${lcx1} ${lcy1}, ${lcx2} ${lcy2}, ${leaf.x} ${leaf.y}`;
 
-                    {/* Node Hover Tooltip Card */}
-                    {isHovered && (
-                      <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-48 bg-[#191f31] border border-white/15 rounded-xl p-2.5 shadow-2xl text-[10px] font-mono text-slate-300 pointer-events-none z-40">
-                        <div className="flex justify-between text-[#b8c4ff] font-bold mb-1">
-                          <span>{node.type?.toUpperCase()}</span>
-                          <span>98% Match</span>
-                        </div>
-                        <p className="line-clamp-2 text-slate-400 font-sans">{node.label}</p>
-                      </div>
-                    )}
-                  </div>
+                      return (
+                        <path
+                          key={leaf.id}
+                          d={leafPath}
+                          fill="none"
+                          stroke={leaf.color}
+                          strokeWidth={1.5}
+                          strokeOpacity={0.25}
+                        />
+                      );
+                    })}
+                  </g>
                 );
               })}
-            </div>
-          )}
+            </svg>
 
-          {/* Context Menu Modal */}
-          {contextMenu && (
+            {/* 1. ROOT CONCEPT NODE (CENTER HERO CARD) */}
             <div
-              className="fixed bg-[#191f31] border border-white/10 rounded-xl p-1.5 shadow-2xl z-50 w-48 text-xs font-mono animate-fade-in"
-              style={{ top: contextMenu.y, left: contextMenu.x }}
+              onClick={() => setSelectedNode(mindMapTree)}
+              style={{
+                position: "absolute",
+                left: `${mindMapTree.x}px`,
+                top: `${mindMapTree.y}px`,
+                transform: "translate(-50%, -50%)",
+              }}
+              className="z-30 cursor-pointer group flex items-center gap-3 px-6 py-4 rounded-2xl bg-[#151b2d] border-2 border-[#6b89ff] shadow-[0_0_50px_rgba(107,137,255,0.4)] hover:shadow-[0_0_70px_rgba(107,137,255,0.6)] transition-all duration-300"
             >
-              <button
-                onClick={() => {
-                  setSelectedNode(contextMenu.node);
-                  setContextMenu(null);
-                }}
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-slate-300 hover:bg-white/5 hover:text-white"
-              >
-                <Eye className="h-3.5 w-3.5 text-[#b8c4ff]" />
-                <span>Focus Thought</span>
-              </button>
-              <button
-                onClick={() => {
-                  setAiDrawerOpen(true);
-                  handleSendMessage(`What would break if thought "${contextMenu.node.label}" disappeared?`);
-                  setContextMenu(null);
-                }}
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-slate-300 hover:bg-white/5 hover:text-white"
-              >
-                <ShieldAlert className="h-3.5 w-3.5 text-amber-400" />
-                <span>Impact Analysis</span>
-              </button>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(contextMenu.node.slug || contextMenu.node.id);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                  setContextMenu(null);
-                }}
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-slate-300 hover:bg-white/5 hover:text-white"
-              >
-                <Copy className="h-3.5 w-3.5 text-emerald-400" />
-                <span>Copy ID</span>
-              </button>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#6b89ff]/20 text-[#b8c4ff] ring-1 ring-[#6b89ff]/40">
+                <Brain className="h-6 w-6" />
+              </div>
+              <span className="text-base font-bold text-white tracking-tight">
+                {mindMapTree.label}
+              </span>
             </div>
-          )}
 
-          {/* Bottom-Right Mini Map */}
-          <div className="absolute bottom-4 right-4 w-48 h-32 bg-[#070d1f]/90 border border-white/10 rounded-xl p-2 backdrop-blur-2xl shadow-2xl pointer-events-auto">
-            <div className="flex items-center justify-between mb-1">
+            {/* 2. FIRST-LEVEL BRANCH CATEGORIES */}
+            {mindMapTree.children?.map((branch) => {
+              const BranchIcon = branch.icon || Lightbulb;
+              const isSelected = selectedNode?.id === branch.id;
+
+              return (
+                <g key={branch.id}>
+                  <div
+                    onClick={() => setSelectedNode(branch)}
+                    style={{
+                      position: "absolute",
+                      left: `${branch.x}px`,
+                      top: `${branch.y}px`,
+                      transform: "translate(-50%, -50%)",
+                    }}
+                    className={`z-20 cursor-pointer group flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#191f31] border transition-all duration-300 ${
+                      isSelected
+                        ? "border-[#b8c4ff] ring-2 ring-[#b8c4ff]/40 shadow-[0_0_30px_rgba(184,196,255,0.3)] scale-105"
+                        : "border-white/10 hover:border-white/30 hover:scale-105 shadow-xl"
+                    }`}
+                  >
+                    <div
+                      className="flex h-7 w-7 items-center justify-center rounded-lg"
+                      style={{
+                        backgroundColor: `${branch.color}20`,
+                        color: branch.color,
+                      }}
+                    >
+                      <BranchIcon className="h-4 w-4" />
+                    </div>
+                    <span className="text-xs font-semibold text-[#dce1fb] group-hover:text-white whitespace-nowrap">
+                      {branch.label}
+                    </span>
+                  </div>
+
+                  {/* 3. SECOND-LEVEL LEAF THOUGHTS */}
+                  {branch.children?.map((leaf) => {
+                    const isLeafSelected = selectedNode?.id === leaf.id;
+
+                    return (
+                      <div
+                        key={leaf.id}
+                        onClick={() => setSelectedNode(leaf)}
+                        style={{
+                          position: "absolute",
+                          left: `${leaf.x}px`,
+                          top: `${leaf.y}px`,
+                          transform: "translate(-50%, -50%)",
+                        }}
+                        className={`z-10 cursor-pointer group flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#070d1f] border transition-all duration-200 ${
+                          isLeafSelected
+                            ? "border-[#b8c4ff] ring-2 ring-[#b8c4ff]/30 scale-110"
+                            : "border-white/10 hover:border-white/30 hover:scale-105"
+                        }`}
+                      >
+                        <span
+                          className="h-2 w-2 rounded-full shadow-[0_0_8px_currentColor]"
+                          style={{
+                            backgroundColor: leaf.color,
+                            color: leaf.color,
+                          }}
+                        />
+                        <span className="text-[11px] font-medium text-slate-300 group-hover:text-white whitespace-nowrap">
+                          {leaf.label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </g>
+              );
+            })}
+          </div>
+
+          {/* Bottom-Left Floating Mini Map Component */}
+          <div className="absolute bottom-4 left-4 w-56 h-36 bg-[#070d1f]/90 border border-white/10 rounded-2xl p-2.5 backdrop-blur-2xl shadow-2xl pointer-events-auto flex flex-col justify-between">
+            <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-semibold">Universe Map</span>
-              <span className="text-[9px] font-mono text-[#b8c4ff]">{filteredMindMapNodes.length} Thoughts</span>
+              <span className="text-[9px] font-mono text-[#b8c4ff]">378 Thoughts</span>
             </div>
-            <div className="w-full h-22 bg-[#151b2d] rounded-lg relative overflow-hidden border border-white/5">
-              <div className="absolute inset-2 border border-[#b8c4ff]/60 bg-[#b8c4ff]/10 rounded-md" />
-              <div className="absolute top-4 left-8 h-2 w-2 rounded-full bg-[#b8c4ff] shadow-[0_0_8px_#b8c4ff]" />
-              <div className="absolute top-10 left-20 h-1.5 w-1.5 rounded-full bg-blue-400" />
-              <div className="absolute top-14 left-32 h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            <div className="w-full flex-1 bg-[#151b2d] rounded-xl relative overflow-hidden border border-white/5 my-1.5">
+              <div className="absolute inset-3 border border-[#b8c4ff]/60 bg-[#b8c4ff]/10 rounded-lg" />
+              <div className="absolute top-7 left-24 h-2.5 w-2.5 rounded-full bg-[#6b89ff] shadow-[0_0_10px_#6b89ff]" />
+            </div>
+            <div className="flex items-center justify-end gap-1">
+              <button onClick={() => setZoomLevel(0.65)} className="p-1 text-slate-400 hover:text-white rounded hover:bg-white/5">
+                <Maximize2 className="h-3 w-3" />
+              </button>
+              <button onClick={() => setZoomLevel((z) => Math.min(z + 0.1, 3.0))} className="p-1 text-slate-400 hover:text-white rounded hover:bg-white/5">
+                <ZoomIn className="h-3 w-3" />
+              </button>
+              <button onClick={() => setZoomLevel((z) => Math.max(z - 0.1, 0.15))} className="p-1 text-slate-400 hover:text-white rounded hover:bg-white/5">
+                <ZoomOut className="h-3 w-3" />
+              </button>
             </div>
           </div>
         </div>
       </main>
 
-      {/* ── 3. RIGHT SIDEBAR: INSPECTOR PANEL ── */}
+      {/* ── 3. RIGHT SIDEBAR: INSPECTOR PANEL (MATCHING REFERENCE UI) ── */}
       <aside
-        className={`transition-all duration-300 flex flex-col border-l border-white/5 bg-[#151b2d]/90 backdrop-blur-xl z-20 ${
-          rightSidebarOpen ? "w-80" : "w-12"
+        className={`transition-all duration-300 flex flex-col border-l border-white/5 bg-[#151b2d]/95 backdrop-blur-2xl z-30 ${
+          rightSidebarOpen ? "w-96" : "w-12"
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-3 border-b border-white/5">
+        <div className="flex items-center justify-between p-3.5 border-b border-white/5">
           <button
             onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
-            className="p-1 text-slate-400 hover:text-white rounded hover:bg-white/5 transition-colors"
+            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
             title={rightSidebarOpen ? "Collapse Inspector" : "Expand Inspector"}
           >
             {rightSidebarOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
@@ -865,134 +693,145 @@ export function KnowledgeGraphStudio() {
 
         {rightSidebarOpen && (
           <div className="flex-1 flex flex-col overflow-hidden">
-            {selectedNode ? (
-              <>
-                {/* Selected Node Hero Header */}
-                <div className="p-4 border-b border-white/5 bg-[#070d1f]/40">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span
-                      className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold"
-                      style={{
-                        backgroundColor: `${selectedNode.color}20`,
-                        color: selectedNode.color,
-                      }}
-                    >
-                      {selectedNode.type || "Thought"}
-                    </span>
-                    <button
-                      onClick={() => {
-                        if (favorites.includes(selectedNode.id)) {
-                          setFavorites(favorites.filter((id) => id !== selectedNode.id));
-                        } else {
-                          setFavorites([...favorites, selectedNode.id]);
-                        }
-                      }}
-                      className="text-slate-400 hover:text-amber-400 transition-colors"
-                    >
-                      <Star className={`h-4 w-4 ${favorites.includes(selectedNode.id) ? "fill-amber-400 text-amber-400" : ""}`} />
-                    </button>
-                  </div>
-                  <h3 className="text-base font-bold text-[#dce1fb] mb-2">{selectedNode.label}</h3>
-
-                  <div className="flex items-center gap-3 text-xs font-mono text-slate-400">
-                    <div className="flex items-center gap-1 text-emerald-400">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      <span>98.5% Relevance</span>
-                    </div>
-                    <span>•</span>
-                    <div className="flex items-center gap-1 text-[#b8c4ff]">
-                      <Calendar className="h-3.5 w-3.5" />
-                      <span>Aug 2026</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Inspector Tabs */}
-                <div className="flex items-center border-b border-white/5 bg-[#191f31]/60 px-2 text-xs font-mono">
-                  {(["overview", "relationships", "documents", "history", "analytics"] as const).map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={`py-2 px-2.5 transition-colors border-b-2 capitalize ${
-                        activeTab === tab
-                          ? "border-[#b8c4ff] text-[#b8c4ff] font-semibold"
-                          : "border-transparent text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Inspector Content */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 text-xs custom-scrollbar">
-                  {activeTab === "overview" && (
-                    <div className="space-y-4">
-                      <div>
-                        <span className="text-[11px] font-mono uppercase text-slate-400 block mb-1 font-semibold">
-                          AI Thought Summary
-                        </span>
-                        <p className="text-slate-300 leading-relaxed bg-[#070d1f] p-3 rounded-xl border border-white/5">
-                          {selectedNode.label} forms a core foundational thought in the BCOS Business Context Operating System. It defines operational standards, governance principles, and automated AI routing rules.
-                        </p>
-                      </div>
-
-                      <div>
-                        <span className="text-[11px] font-mono uppercase text-slate-400 block mb-1 font-semibold">
-                          384-D Vector Embedding Preview
-                        </span>
-                        <div className="bg-[#070d1f] p-2.5 rounded-xl border border-white/5 font-mono text-[10px] text-[#b8c4ff] truncate">
-                          [0.0241, -0.1982, 0.4410, 0.0821, -0.3104, 0.1198, ...]
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {activeTab === "relationships" && (
-                    <div className="space-y-2">
-                      <span className="text-[11px] font-mono uppercase text-slate-400 block mb-2 font-semibold">
-                        Connected Concept Branches ({RELATIONSHIP_LABELS.length})
-                      </span>
-                      {RELATIONSHIP_LABELS.map((rel, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center justify-between p-2 rounded-lg bg-[#070d1f] border border-white/5"
-                        >
-                          <span className="text-[#b8c4ff] font-mono text-[11px]">{rel}</span>
-                          <span className="text-slate-300">Thought Branch #{i + 1}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {activeTab === "analytics" && (
-                    <div className="space-y-3 font-mono">
-                      <div className="p-3 bg-[#070d1f] rounded-xl border border-white/5 space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Branch Centrality:</span>
-                          <span className="text-emerald-400 font-bold">14 Connections</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-400">Thought Weight:</span>
-                          <span className="text-[#b8c4ff] font-bold">0.945</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="flex h-full items-center justify-center p-6 text-center text-slate-500 text-xs">
-                Select any thought node on the infinite canvas to inspect details and AI analytics.
+            {/* Selected Node Hero Header */}
+            <div className="p-5 border-b border-white/5 bg-[#070d1f]/40">
+              <div className="flex items-center justify-between mb-2">
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-bold bg-[#6b89ff]/20 text-[#b8c4ff] border border-[#6b89ff]/30">
+                  {selectedNode?.type?.toUpperCase() || "DOMAIN"}
+                </span>
+                <button className="text-slate-400 hover:text-amber-400 transition-colors">
+                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                </button>
               </div>
-            )}
+              <h3 className="text-lg font-bold text-white mb-2 leading-snug">
+                {selectedNode?.label || "Retrieval Augmented Generation"}
+              </h3>
+
+              <div className="flex items-center gap-3 text-xs font-mono text-slate-400">
+                <div className="flex items-center gap-1 text-emerald-400">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>98.5% Relevance</span>
+                </div>
+                <span>•</span>
+                <div className="flex items-center gap-1 text-[#b8c4ff]">
+                  <Calendar className="h-3.5 w-3.5" />
+                  <span>Aug 2026</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Inspector Tabs */}
+            <div className="flex items-center border-b border-white/5 bg-[#191f31]/60 px-3 text-xs font-mono">
+              {(["overview", "relationships", "documents", "history"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`py-2.5 px-3 transition-colors border-b-2 capitalize ${
+                    activeTab === tab
+                      ? "border-[#b8c4ff] text-[#b8c4ff] font-bold"
+                      : "border-transparent text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {tab}
+                  {tab === "relationships" && <span className="ml-1 text-[10px] opacity-60">24</span>}
+                  {tab === "documents" && <span className="ml-1 text-[10px] opacity-60">156</span>}
+                </button>
+              ))}
+            </div>
+
+            {/* Inspector Scroll Content */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-5 text-xs custom-scrollbar">
+              {activeTab === "overview" && (
+                <>
+                  {/* AI Summary Box */}
+                  <div>
+                    <span className="text-[10px] font-mono uppercase text-slate-400 block mb-1.5 font-bold">
+                      AI Summary
+                    </span>
+                    <p className="text-slate-300 leading-relaxed bg-[#070d1f] p-3.5 rounded-xl border border-white/5 font-sans">
+                      Retrieval Augmented Generation (RAG) combines the power of large language models with external knowledge retrieval to generate more accurate, factual, and up-to-date responses. It reduces hallucinations and improves reliability by grounding outputs in trusted data sources.
+                    </p>
+                  </div>
+
+                  {/* Key Attributes Table */}
+                  <div>
+                    <span className="text-[10px] font-mono uppercase text-slate-400 block mb-2 font-bold">
+                      Key Attributes
+                    </span>
+                    <div className="bg-[#070d1f] rounded-xl border border-white/5 divide-y divide-white/5 font-mono text-xs">
+                      <div className="flex justify-between p-2.5">
+                        <span className="text-slate-400">Type</span>
+                        <span className="text-white font-semibold">Concept</span>
+                      </div>
+                      <div className="flex justify-between p-2.5">
+                        <span className="text-slate-400">Confidence</span>
+                        <span className="text-emerald-400 font-semibold">98.5%</span>
+                      </div>
+                      <div className="flex justify-between p-2.5">
+                        <span className="text-slate-400">First Seen</span>
+                        <span className="text-slate-300">Mar 12, 2025</span>
+                      </div>
+                      <div className="flex justify-between p-2.5">
+                        <span className="text-slate-400">Last Updated</span>
+                        <span className="text-slate-300">Aug 20, 2026</span>
+                      </div>
+                      <div className="flex justify-between p-2.5">
+                        <span className="text-slate-400">Connections</span>
+                        <span className="text-[#b8c4ff] font-semibold">24</span>
+                      </div>
+                      <div className="flex justify-between p-2.5">
+                        <span className="text-slate-400">Documents</span>
+                        <span className="text-[#b8c4ff] font-semibold">156</span>
+                      </div>
+                      <div className="flex justify-between p-2.5">
+                        <span className="text-slate-400">Domain</span>
+                        <span className="text-blue-400 font-semibold">AI & Machine Learning</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Vector Embeddings Preview */}
+                  <div>
+                    <span className="text-[10px] font-mono uppercase text-slate-400 block mb-1.5 font-bold">
+                      Embedding Preview (384-D)
+                    </span>
+                    <div className="bg-[#070d1f] p-3 rounded-xl border border-white/5 font-mono text-[10px] text-[#b8c4ff] truncate">
+                      [0.0241, -0.1982, 0.4410, 0.0821, -0.3104, 0.1102, ...]
+                    </div>
+                  </div>
+
+                  {/* Tags */}
+                  <div>
+                    <span className="text-[10px] font-mono uppercase text-slate-400 block mb-2 font-bold">
+                      Tags
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {["AI", "RAG", "LLM", "Retrieval", "Knowledge"].map((t) => (
+                        <span key={t} className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-[10px] font-mono text-slate-300">
+                          {t}
+                        </span>
+                      ))}
+                      <button className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[10px] font-mono text-slate-400">
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Primary CTA Button */}
+                  <button className="w-full py-3 px-4 rounded-xl bg-[#b8c4ff] text-[#002585] font-bold text-xs flex items-center justify-center gap-2 hover:bg-white shadow-[0_0_20px_rgba(184,196,255,0.3)] transition-all">
+                    <span>Open in Knowledge Base</span>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         )}
       </aside>
 
       {/* ── 4. FLOATING AI ASK BRAIN DRAWER ── */}
       {aiDrawerOpen && (
-        <div className="absolute top-16 right-84 w-96 bg-[#151b2d]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl z-40 flex flex-col overflow-hidden animate-slide-up">
+        <div className="absolute top-16 right-96 w-96 bg-[#151b2d]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl z-40 flex flex-col overflow-hidden animate-slide-up">
           <div className="p-3.5 border-b border-white/10 bg-[#070d1f]/60 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Brain className="h-4 w-4 text-[#b8c4ff]" />
@@ -1003,28 +842,7 @@ export function KnowledgeGraphStudio() {
             </button>
           </div>
 
-          <div className="p-3 border-b border-white/5 bg-[#191f31]/40 flex flex-wrap gap-1.5">
-            <button
-              onClick={() => handleSendMessage("What documents created this knowledge?")}
-              className="px-2 py-1 bg-white/5 hover:bg-[#b8c4ff]/20 text-[10px] text-[#b8c4ff] rounded border border-white/5 transition-colors"
-            >
-              What created this?
-            </button>
-            <button
-              onClick={() => handleSendMessage("What would break if this node disappeared?")}
-              className="px-2 py-1 bg-white/5 hover:bg-[#b8c4ff]/20 text-[10px] text-[#b8c4ff] rounded border border-white/5 transition-colors"
-            >
-              Impact analysis?
-            </button>
-            <button
-              onClick={() => handleSendMessage("Summarize this cluster.")}
-              className="px-2 py-1 bg-white/5 hover:bg-[#b8c4ff]/20 text-[10px] text-[#b8c4ff] rounded border border-white/5 transition-colors"
-            >
-              Summarize cluster
-            </button>
-          </div>
-
-          <div className="h-64 overflow-y-auto p-3 space-y-3 text-xs custom-scrollbar">
+          <div className="h-64 overflow-y-auto p-3.5 space-y-3 text-xs custom-scrollbar">
             {aiMessages.length === 0 ? (
               <p className="text-slate-500 text-center py-8 text-[11px]">
                 Ask questions about thought dependencies, critical paths, or cluster summaries.
@@ -1033,7 +851,7 @@ export function KnowledgeGraphStudio() {
               aiMessages.map((msg, idx) => (
                 <div
                   key={idx}
-                  className={`p-2.5 rounded-lg max-w-[85%] ${
+                  className={`p-3 rounded-xl max-w-[85%] ${
                     msg.sender === "user"
                       ? "bg-[#6b89ff]/20 text-[#dce1fb] border border-[#6b89ff]/30 ml-auto"
                       : "bg-[#070d1f] text-slate-300 border border-white/5"
@@ -1052,13 +870,13 @@ export function KnowledgeGraphStudio() {
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-              className="flex-1 bg-[#151b2d] border border-white/10 rounded-lg px-3 py-1.5 text-xs text-[#dce1fb] focus:outline-none focus:border-[#b8c4ff]"
+              className="flex-1 bg-[#151b2d] border border-white/10 rounded-xl px-3 py-2 text-xs text-[#dce1fb] focus:outline-none focus:border-[#b8c4ff]"
             />
             <button
               onClick={() => handleSendMessage()}
-              className="p-2 bg-[#b8c4ff] text-[#002585] rounded-lg hover:bg-white transition-colors"
+              className="p-2 bg-[#b8c4ff] text-[#002585] rounded-xl hover:bg-white transition-colors"
             >
-              <Send className="h-3.5 w-3.5" />
+              <Send className="h-4 w-4" />
             </button>
           </div>
         </div>
