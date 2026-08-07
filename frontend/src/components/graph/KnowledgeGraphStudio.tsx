@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   Search,
   Layers,
@@ -32,6 +32,12 @@ import {
   Info,
   Send,
   HelpCircle,
+  Link,
+  Code,
+  Box,
+  Copy,
+  Check,
+  Zap,
 } from "lucide-react";
 import { type GraphData, type GraphNode, type GraphLink, api } from "@/lib/api";
 
@@ -59,7 +65,7 @@ const DOMAINS = [
   "Strategy",
 ];
 
-const RELATIONSHIP_TYPES = [
+const RELATIONSHIP_LABELS = [
   "depends on",
   "contains",
   "created by",
@@ -71,8 +77,10 @@ const RELATIONSHIP_TYPES = [
   "conflicts with",
 ];
 
+const SAMPLE_TAGS = ["#RAG", "#AI-Routing", "#Pricing", "#Scale", "#GDPR", "#Legal", "#Architecture", "#Growth"];
+
 export function KnowledgeGraphStudio() {
-  // Data state
+  // Data State
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -83,7 +91,13 @@ export function KnowledgeGraphStudio() {
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [selectedTypes, setSelectedTypes] = useState<string[]>(NODE_TYPES.map((t) => t.id));
   const [selectedDomain, setSelectedDomain] = useState<string>("all");
-  
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [copied, setCopied] = useState(false);
+
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; node: GraphNode } | null>(null);
+
   // UI Panels State
   const [leftSidebarOpen, setLeftSidebarOpen] = useState(true);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(true);
@@ -92,11 +106,15 @@ export function KnowledgeGraphStudio() {
   const [aiMessages, setAiMessages] = useState<Array<{ sender: "user" | "ai"; text: string }>>([]);
   const [chatInput, setChatInput] = useState("");
 
-  // Canvas View Mode State
+  // Canvas Viewport State
   const [viewMode, setViewMode] = useState<"canvas" | "timeline" | "cluster">("canvas");
   const [analyticsOverlay, setAnalyticsOverlay] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Load Graph Data
   useEffect(() => {
@@ -116,24 +134,38 @@ export function KnowledgeGraphStudio() {
     load();
   }, []);
 
+  // Keyboard Shortcuts (Ctrl+F, Esc)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (e.key === "Escape") {
+        setContextMenu(null);
+        setHoveredNode(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // Filtered nodes
   const filteredNodes = useMemo(() => {
     if (!graphData) return [];
     return graphData.nodes.filter((node) => {
-      // Search match
       const queryMatch =
         searchQuery === "" ||
         node.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
         node.department?.toLowerCase().includes(searchQuery.toLowerCase());
 
-      // Domain match
       const domainMatch = selectedDomain === "all" || node.department === selectedDomain;
+      const tagMatch = !selectedTag || (selectedTag === "#RAG" && node.label.toLowerCase().includes("ai"));
 
-      return queryMatch && domainMatch;
+      return queryMatch && domainMatch && tagMatch;
     });
-  }, [graphData, searchQuery, selectedDomain]);
+  }, [graphData, searchQuery, selectedDomain, selectedTag]);
 
-  // AI Chat handler
+  // AI Chat Handler
   const handleSendMessage = (textToSend?: string) => {
     const query = textToSend || chatInput;
     if (!query.trim()) return;
@@ -156,9 +188,11 @@ export function KnowledgeGraphStudio() {
     e.preventDefault();
     if (!naturalLanguageQuery.trim()) return;
     setSearchQuery(naturalLanguageQuery);
+    setAiDrawerOpen(true);
+    handleSendMessage(`Show everything related to "${naturalLanguageQuery}"`);
   };
 
-  // Node Type Color Helper
+  // Node Color Helper
   const getNodeColor = (type?: string) => {
     switch (type?.toLowerCase()) {
       case "department":
@@ -181,8 +215,50 @@ export function KnowledgeGraphStudio() {
     }
   };
 
+  // Canvas Mouse Pan Handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.button === 0 && !contextMenu) {
+      setIsPanning(true);
+      setDragStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (isPanning) {
+      setPanOffset({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y,
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsPanning(false);
+  };
+
+  // Node Context Menu
+  const handleContextMenu = (e: React.MouseEvent, node: GraphNode) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({ x: e.clientX, y: e.clientY, node });
+  };
+
+  // Export Snapshot Helpers
+  const exportJSON = () => {
+    if (!graphData) return;
+    const blob = new Blob([JSON.stringify(graphData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "bcos_knowledge_graph.json";
+    a.click();
+  };
+
   return (
-    <div className="flex h-[calc(100vh-5rem)] w-full overflow-hidden bg-[#0c1324] text-[#dce1fb] rounded-xl border border-white/5 shadow-2xl relative">
+    <div
+      className="flex h-[calc(100vh-5rem)] w-full overflow-hidden bg-[#0c1324] text-[#dce1fb] rounded-xl border border-white/5 shadow-2xl relative select-none"
+      onClick={() => setContextMenu(null)}
+    >
       {/* ── 1. LEFT SIDEBAR: KNOWLEDGE EXPLORER ── */}
       <aside
         className={`transition-all duration-300 flex flex-col border-r border-white/5 bg-[#151b2d]/80 backdrop-blur-xl z-20 ${
@@ -202,7 +278,7 @@ export function KnowledgeGraphStudio() {
           <button
             onClick={() => setLeftSidebarOpen(!leftSidebarOpen)}
             className="p-1 text-slate-400 hover:text-white rounded hover:bg-white/5 transition-colors ml-auto"
-            title={leftSidebarOpen ? "Collapse Left Sidebar" : "Expand Left Sidebar"}
+            title={leftSidebarOpen ? "Collapse Explorer" : "Expand Explorer"}
           >
             {leftSidebarOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </button>
@@ -210,15 +286,16 @@ export function KnowledgeGraphStudio() {
 
         {leftSidebarOpen && (
           <div className="flex-1 overflow-y-auto p-3 space-y-5 custom-scrollbar">
-            {/* Search Input */}
+            {/* Search Input with Ctrl+F Hint */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <input
+                ref={searchInputRef}
                 type="text"
-                placeholder="Search nodes or tags..."
+                placeholder="Search graph (Ctrl + F)..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#191f31] border border-white/5 rounded-lg py-2 pl-9 pr-3 text-xs text-[#dce1fb] placeholder:text-slate-500 focus:outline-none focus:border-[#b8c4ff]/50 focus:ring-1 focus:ring-[#b8c4ff]/30 transition-all"
+                className="w-full bg-[#191f31] border border-white/5 rounded-lg py-2 pl-9 pr-8 text-xs text-[#dce1fb] placeholder:text-slate-500 focus:outline-none focus:border-[#b8c4ff]/50 focus:ring-1 focus:ring-[#b8c4ff]/30 transition-all"
               />
               {searchQuery && (
                 <button
@@ -302,10 +379,34 @@ export function KnowledgeGraphStudio() {
               </div>
             </div>
 
-            {/* Collections & Saved Views */}
+            {/* Tags Filter */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 font-mono">
+                  Tags & Collections
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {SAMPLE_TAGS.map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors ${
+                      selectedTag === tag
+                        ? "bg-[#b8c4ff] text-[#002585] font-semibold"
+                        : "bg-white/5 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Saved Views & Favorites */}
             <div className="pt-2 border-t border-white/5">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 font-mono block mb-2">
-                Saved Views
+                Favorites & Views
               </span>
               <div className="space-y-1">
                 <button className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs text-slate-400 hover:bg-white/5 hover:text-white transition-colors">
@@ -314,7 +415,11 @@ export function KnowledgeGraphStudio() {
                 </button>
                 <button className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs text-slate-400 hover:bg-white/5 hover:text-white transition-colors">
                   <Activity className="h-3.5 w-3.5 text-emerald-400" />
-                  <span>High-Degree Hubs</span>
+                  <span>Critical Hubs</span>
+                </button>
+                <button className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-xs text-slate-400 hover:bg-white/5 hover:text-white transition-colors">
+                  <Clock className="h-3.5 w-3.5 text-blue-400" />
+                  <span>Recently Viewed</span>
                 </button>
               </div>
             </div>
@@ -323,7 +428,12 @@ export function KnowledgeGraphStudio() {
       </aside>
 
       {/* ── 2. CENTER: INFINITE CANVAS WORKSPACE ── */}
-      <main className="flex-1 flex flex-col relative overflow-hidden bg-[#0c1324]">
+      <main
+        className="flex-1 flex flex-col relative overflow-hidden bg-[#0c1324]"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+      >
         {/* Top Control Toolbar */}
         <div className="h-12 border-b border-white/5 bg-[#151b2d]/60 backdrop-blur-md px-4 flex items-center justify-between z-10">
           {/* Natural Language Query Bar */}
@@ -378,13 +488,22 @@ export function KnowledgeGraphStudio() {
                   ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
                   : "bg-[#191f31] text-slate-400 border-white/5 hover:text-white"
               }`}
-              title="Toggle Analytics & Hub Overlay"
+              title="Toggle Hub & Analytics Overlay"
             >
               <BarChart2 className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Analytics</span>
             </button>
 
-            {/* Canvas Actions */}
+            {/* Export Menu */}
+            <button
+              onClick={exportJSON}
+              className="p-2 bg-[#191f31] border border-white/5 hover:bg-white/5 text-slate-400 hover:text-white rounded-lg transition-colors"
+              title="Export Graph Snapshot JSON"
+            >
+              <Download className="h-3.5 w-3.5" />
+            </button>
+
+            {/* Canvas Zoom Actions */}
             <div className="flex items-center gap-1 bg-[#191f31] p-1 rounded-lg border border-white/5">
               <button
                 onClick={() => setZoomLevel((z) => Math.min(z + 0.2, 2.5))}
@@ -412,7 +531,7 @@ export function KnowledgeGraphStudio() {
               </button>
             </div>
 
-            {/* AI Graph Assistant Drawer Toggle */}
+            {/* AI Assistant Button */}
             <button
               onClick={() => setAiDrawerOpen(!aiDrawerOpen)}
               className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-[#6b89ff] to-[#b8c4ff] text-[#002585] font-semibold text-xs flex items-center gap-1.5 hover:shadow-[0_0_15px_rgba(184,196,255,0.4)] transition-all"
@@ -423,9 +542,9 @@ export function KnowledgeGraphStudio() {
           </div>
         </div>
 
-        {/* Interactive Infinite Canvas Viewport */}
-        <div className="flex-1 relative cursor-grab active:cursor-grabbing overflow-hidden">
-          {/* Subtle Thin Grid Background */}
+        {/* Infinite Canvas Viewport */}
+        <div className="flex-1 relative overflow-hidden">
+          {/* Thin Grid Background */}
           <div
             className="absolute inset-0 pointer-events-none opacity-20"
             style={{
@@ -444,7 +563,7 @@ export function KnowledgeGraphStudio() {
             </div>
           ) : (
             <div
-              className="w-full h-full relative transition-transform duration-100 ease-out"
+              className="w-full h-full relative transition-transform duration-75 ease-out"
               style={{
                 transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
                 transformOrigin: "center center",
@@ -459,6 +578,8 @@ export function KnowledgeGraphStudio() {
 
                   const isConnected =
                     selectedNode && (selectedNode.id === sourceNode.id || selectedNode.id === targetNode.id);
+
+                  const relLabel = RELATIONSHIP_LABELS[idx % RELATIONSHIP_LABELS.length];
 
                   return (
                     <g key={idx}>
@@ -488,6 +609,7 @@ export function KnowledgeGraphStudio() {
                     <div
                       key={node.id}
                       onClick={() => setSelectedNode(node)}
+                      onContextMenu={(e) => handleContextMenu(e, node)}
                       onMouseEnter={() => setHoveredNode(node)}
                       onMouseLeave={() => setHoveredNode(null)}
                       className={`group relative p-3.5 rounded-xl backdrop-blur-xl transition-all duration-300 cursor-pointer ${
@@ -520,7 +642,7 @@ export function KnowledgeGraphStudio() {
                         {node.label}
                       </h4>
 
-                      {/* Department Tag & Metadata count */}
+                      {/* Department Tag & Metadata Count */}
                       <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono pt-2 border-t border-white/5">
                         <span>{node.department || "General"}</span>
                         <span className="flex items-center gap-1 text-slate-400">
@@ -529,7 +651,7 @@ export function KnowledgeGraphStudio() {
                         </span>
                       </div>
 
-                      {/* Analytics Overlay Glow */}
+                      {/* Analytics Overlay Badge */}
                       {analyticsOverlay && (
                         <div className="absolute -top-1 -right-1 h-4 w-4 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-full flex items-center justify-center text-[9px] font-mono">
                           H
@@ -542,7 +664,49 @@ export function KnowledgeGraphStudio() {
             </div>
           )}
 
-          {/* Bottom-Right Mini Map Component */}
+          {/* Context Menu Modal */}
+          {contextMenu && (
+            <div
+              className="fixed bg-[#191f31] border border-white/10 rounded-xl p-1.5 shadow-2xl z-50 w-48 text-xs font-mono animate-fade-in"
+              style={{ top: contextMenu.y, left: contextMenu.x }}
+            >
+              <button
+                onClick={() => {
+                  setSelectedNode(contextMenu.node);
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-slate-300 hover:bg-white/5 hover:text-white"
+              >
+                <Eye className="h-3.5 w-3.5 text-[#b8c4ff]" />
+                <span>Inspect Node</span>
+              </button>
+              <button
+                onClick={() => {
+                  setAiDrawerOpen(true);
+                  handleSendMessage(`What would break if node "${contextMenu.node.label}" disappeared?`);
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-slate-300 hover:bg-white/5 hover:text-white"
+              >
+                <ShieldAlert className="h-3.5 w-3.5 text-amber-400" />
+                <span>Impact Analysis</span>
+              </button>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(contextMenu.node.slug || contextMenu.node.id);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                  setContextMenu(null);
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded text-slate-300 hover:bg-white/5 hover:text-white"
+              >
+                <Copy className="h-3.5 w-3.5 text-emerald-400" />
+                <span>Copy Slug</span>
+              </button>
+            </div>
+          )}
+
+          {/* Mini Map Component */}
           <div className="absolute bottom-4 right-4 w-48 h-32 bg-[#070d1f]/90 border border-white/10 rounded-lg p-2 backdrop-blur-xl shadow-2xl pointer-events-auto">
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Mini Map</span>
@@ -571,7 +735,7 @@ export function KnowledgeGraphStudio() {
           <button
             onClick={() => setRightSidebarOpen(!rightSidebarOpen)}
             className="p-1 text-slate-400 hover:text-white rounded hover:bg-white/5 transition-colors"
-            title={rightSidebarOpen ? "Collapse Right Sidebar" : "Expand Right Sidebar"}
+            title={rightSidebarOpen ? "Collapse Inspector" : "Expand Inspector"}
           >
             {rightSidebarOpen ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </button>
@@ -591,23 +755,39 @@ export function KnowledgeGraphStudio() {
               <>
                 {/* Selected Node Hero Header */}
                 <div className="p-4 border-b border-white/5 bg-[#070d1f]/40">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span
-                      className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold"
-                      style={{
-                        backgroundColor: `${getNodeColor(selectedNode.type)}20`,
-                        color: getNodeColor(selectedNode.type),
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="px-2 py-0.5 rounded text-[10px] font-mono uppercase font-semibold"
+                        style={{
+                          backgroundColor: `${getNodeColor(selectedNode.type)}20`,
+                          color: getNodeColor(selectedNode.type),
+                        }}
+                      >
+                        {selectedNode.type || "Module"}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {selectedNode.department || "General"}
+                      </span>
+                    </div>
+
+                    {/* Favorite Toggle Button */}
+                    <button
+                      onClick={() => {
+                        if (favorites.includes(selectedNode.id)) {
+                          setFavorites(favorites.filter((id) => id !== selectedNode.id));
+                        } else {
+                          setFavorites([...favorites, selectedNode.id]);
+                        }
                       }}
+                      className="text-slate-400 hover:text-amber-400 transition-colors"
                     >
-                      {selectedNode.type || "Module"}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      {selectedNode.department || "General"}
-                    </span>
+                      <Star className={`h-4 w-4 ${favorites.includes(selectedNode.id) ? "fill-amber-400 text-amber-400" : ""}`} />
+                    </button>
                   </div>
                   <h3 className="text-base font-bold text-white mb-2">{selectedNode.label}</h3>
 
-                  {/* Confidence Score & Metadata Pill */}
+                  {/* Confidence Score & Date Tag */}
                   <div className="flex items-center gap-3 text-xs font-mono text-slate-400">
                     <div className="flex items-center gap-1 text-emerald-400">
                       <CheckCircle2 className="h-3.5 w-3.5" />
@@ -644,7 +824,7 @@ export function KnowledgeGraphStudio() {
                     <div className="space-y-4">
                       <div>
                         <span className="text-[11px] font-mono uppercase text-slate-400 block mb-1">
-                          AI-Generated Executive Summary
+                          AI Executive Summary
                         </span>
                         <p className="text-slate-300 leading-relaxed bg-[#070d1f] p-3 rounded-lg border border-white/5">
                           {selectedNode.label} forms a core foundational module in the BCOS Business Context Operating System. It defines operational standards, governance principles, and automated AI routing rules.
@@ -653,7 +833,7 @@ export function KnowledgeGraphStudio() {
 
                       <div>
                         <span className="text-[11px] font-mono uppercase text-slate-400 block mb-1">
-                          Vector Embeddings Preview
+                          Embeddings Vector Preview (384-d)
                         </span>
                         <div className="bg-[#070d1f] p-2.5 rounded-lg border border-white/5 font-mono text-[10px] text-[#b8c4ff] truncate">
                           [0.0241, -0.1982, 0.4410, 0.0821, -0.3104, 0.1198, ...]
@@ -665,15 +845,15 @@ export function KnowledgeGraphStudio() {
                   {activeTab === "relationships" && (
                     <div className="space-y-2">
                       <span className="text-[11px] font-mono uppercase text-slate-400 block mb-2">
-                        Connected Entities ({RELATIONSHIP_TYPES.length})
+                        Connected Entities ({RELATIONSHIP_LABELS.length})
                       </span>
-                      {RELATIONSHIP_TYPES.map((rel, i) => (
+                      {RELATIONSHIP_LABELS.map((rel, i) => (
                         <div
                           key={i}
                           className="flex items-center justify-between p-2 rounded bg-[#070d1f] border border-white/5"
                         >
                           <span className="text-[#b8c4ff] font-mono text-[11px]">{rel}</span>
-                          <span className="text-slate-300">Target Node #{i + 1}</span>
+                          <span className="text-slate-300">Module #{i + 1}</span>
                         </div>
                       ))}
                     </div>
@@ -683,15 +863,15 @@ export function KnowledgeGraphStudio() {
                     <div className="space-y-3 font-mono">
                       <div className="p-3 bg-[#070d1f] rounded-lg border border-white/5 space-y-2">
                         <div className="flex justify-between">
-                          <span className="text-slate-400">Node Degree:</span>
-                          <span className="text-emerald-400 font-bold">14 Link Edges</span>
+                          <span className="text-slate-400">Degree Centrality:</span>
+                          <span className="text-emerald-400 font-bold">14 Edges</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-400">Betweenness Centrality:</span>
+                          <span className="text-slate-400">Eigenvector Score:</span>
                           <span className="text-[#b8c4ff] font-bold">0.892</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-400">Cluster Affinity:</span>
+                          <span className="text-slate-400">Cluster Group:</span>
                           <span className="text-purple-400 font-bold">Core Architecture</span>
                         </div>
                       </div>
