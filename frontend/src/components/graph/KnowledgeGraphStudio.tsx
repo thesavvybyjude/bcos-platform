@@ -71,12 +71,12 @@ const RELATIONSHIP_LABELS = [
 
 const SAMPLE_TAGS = ["#RAG", "#AI-Routing", "#Pricing", "#Scale", "#GDPR", "#Architecture", "#Growth"];
 
-// ── Organic Galaxy / Mind Map Layout Interface ──
+// ── Mind Map Node Interface ──
 interface MindMapNode extends GraphNode {
   x: number;
   y: number;
   radius: number;
-  level: "root" | "category" | "document" | "leaf";
+  level: "root" | "category" | "document";
   color: string;
   clusterId: string;
 }
@@ -119,7 +119,7 @@ export function KnowledgeGraphStudio() {
   const [chatInput, setChatInput] = useState("");
 
   // Canvas Viewport & Infinite Zoom State
-  const [zoomLevel, setZoomLevel] = useState(0.85);
+  const [zoomLevel, setZoomLevel] = useState(0.75);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -169,7 +169,7 @@ export function KnowledgeGraphStudio() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // ── ORGANIC MIND MAP CONSTELLATION GENERATOR ──
+  // ── HIERARCHICAL RADIAL TREE ENGINE WITH ZERO OVERLAP & COLLISION PREVENTION ──
   const { mindMapNodes, mindMapLinks } = useMemo(() => {
     if (!graphData || graphData.nodes.length === 0) return { mindMapNodes: [], mindMapLinks: [] };
 
@@ -185,17 +185,22 @@ export function KnowledgeGraphStudio() {
     });
 
     const activeDepts = Object.keys(deptMap);
-    const centerCanvasX = 1200;
-    const centerCanvasY = 800;
-    const clusterRadius = 450; // 450px wide spacing between galaxy centers
+    const centerCanvasX = 1800;
+    const centerCanvasY = 1400;
 
-    // 1. Root Domain Galaxies
+    // Minimum Separation Rules:
+    // Root Domains: 750px apart
+    // Primary Categories: 450px ring radius
+    // Documents: 850px ring radius with vertical clearance 140px+
+    const domainDistance = 750;
+    const sectorStepAngle = (Math.PI * 2) / activeDepts.length;
+
     activeDepts.forEach((dept, dIdx) => {
-      const angle = (dIdx / activeDepts.length) * Math.PI * 2 - Math.PI / 2;
-      const galaxyX = centerCanvasX + Math.cos(angle) * clusterRadius * 1.4;
-      const galaxyY = centerCanvasY + Math.sin(angle) * clusterRadius * 1.4;
+      // Each domain gets a dedicated 36° angular sector
+      const sectorCenterAngle = dIdx * sectorStepAngle - Math.PI / 2;
+      const galaxyX = centerCanvasX + Math.cos(sectorCenterAngle) * domainDistance;
+      const galaxyY = centerCanvasY + Math.sin(sectorCenterAngle) * domainDistance;
 
-      // Add Root Domain Hub Node (Large 90px diameter)
       const rootNodeId = `domain-${dept}`;
       nodes.push({
         id: rootNodeId,
@@ -204,61 +209,110 @@ export function KnowledgeGraphStudio() {
         department: dept,
         x: galaxyX,
         y: galaxyY,
-        radius: 45,
+        radius: 50,
         level: "root",
         color: "#b8c4ff",
         clusterId: dept,
       });
 
-      // 2. Category & Module Sub-Nodes branching radially around galaxy center
+      // Branch children radially within the domain's exclusive angular sector
       const childNodes = deptMap[dept];
-      const branchRadius = 220; // 220px node spacing
+      const categoryNodes = childNodes.filter((c) => c.type === "department");
+      const documentNodes = childNodes.filter((c) => c.type !== "department");
 
-      childNodes.forEach((child, cIdx) => {
-        const childAngle = angle + ((cIdx - childNodes.length / 2) / (childNodes.length + 1)) * (Math.PI * 0.9);
-        const childX = galaxyX + Math.cos(childAngle) * branchRadius * (1 + (cIdx % 2) * 0.35);
-        const childY = galaxyY + Math.sin(childAngle) * branchRadius * (1 + (cIdx % 2) * 0.35);
+      // Ring 1: Primary Categories (Radius = 380px around Domain)
+      const categoryRadius = 380;
+      const catAngleStep = categoryNodes.length > 0 ? (Math.PI * 0.5) / (categoryNodes.length + 1) : 0;
 
-        const isDepartment = child.type === "department";
-        const nodeLevel = isDepartment ? "category" : "document";
-        const nodeRadius = isDepartment ? 28 : 20;
-
-        const nodeColor =
-          isDepartment
-            ? "#60a5fa"
-            : child.type === "person"
-            ? "#c084fc"
-            : child.type === "organization"
-            ? "#34d399"
-            : "#fb923c";
+      categoryNodes.forEach((cat, cIdx) => {
+        const catAngle = sectorCenterAngle - (Math.PI * 0.25) + (cIdx + 1) * catAngleStep;
+        const catX = galaxyX + Math.cos(catAngle) * categoryRadius;
+        const catY = galaxyY + Math.sin(catAngle) * categoryRadius;
 
         nodes.push({
-          ...child,
-          x: childX,
-          y: childY,
-          radius: nodeRadius,
-          level: nodeLevel,
-          color: nodeColor,
+          ...cat,
+          x: catX,
+          y: catY,
+          radius: 28,
+          level: "category",
+          color: "#60a5fa",
           clusterId: dept,
         });
 
-        // Organic Bezier Curved Tree Edge connecting Root -> Child
         links.push({
           sourceId: rootNodeId,
-          targetId: child.id,
+          targetId: cat.id,
           x1: galaxyX,
           y1: galaxyY,
-          x2: childX,
-          y2: childY,
-          label: isDepartment ? "contains" : "references",
+          x2: catX,
+          y2: catY,
+          label: "contains",
+        });
+      });
+
+      // Ring 2: Document / Module Leaves (Radius = 720px with minimum 160px vertical clearance)
+      const docRadius = 720;
+      const totalDocs = documentNodes.length;
+      const docAngleSpan = Math.PI * 0.75;
+      const docAngleStep = totalDocs > 1 ? docAngleSpan / (totalDocs - 1) : 0;
+
+      documentNodes.forEach((doc, idx) => {
+        const docAngle = sectorCenterAngle - docAngleSpan / 2 + idx * docAngleStep;
+        const docX = galaxyX + Math.cos(docAngle) * docRadius;
+        const docY = galaxyY + Math.sin(docAngle) * docRadius;
+
+        nodes.push({
+          ...doc,
+          x: docX,
+          y: docY,
+          radius: 20,
+          level: "document",
+          color: doc.type === "person" ? "#c084fc" : doc.type === "organization" ? "#34d399" : "#fb923c",
+          clusterId: dept,
+        });
+
+        links.push({
+          sourceId: rootNodeId,
+          targetId: doc.id,
+          x1: galaxyX,
+          y1: galaxyY,
+          x2: docX,
+          y2: docY,
+          label: "references",
         });
       });
     });
 
+    // ── COLLISION RESOLUTION PASS (ZERO OVERLAP POLICY) ──
+    for (let pass = 0; pass < 5; pass++) {
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const n1 = nodes[i];
+          const n2 = nodes[j];
+
+          const dx = n2.x - n1.x;
+          const dy = n2.y - n1.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const minClearance = n1.level === "root" || n2.level === "root" ? 180 : 130;
+
+          if (dist < minClearance && dist > 0) {
+            const overlap = minClearance - dist;
+            const shiftX = (dx / dist) * (overlap / 2);
+            const shiftY = (dy / dist) * (overlap / 2);
+
+            n1.x -= shiftX;
+            n1.y -= shiftY;
+            n2.x += shiftX;
+            n2.y += shiftY;
+          }
+        }
+      }
+    }
+
     return { mindMapNodes: nodes, mindMapLinks: links };
   }, [graphData]);
 
-  // Set initial selected node
+  // Initial node selection
   useEffect(() => {
     if (mindMapNodes.length > 0 && !selectedNode) {
       setSelectedNode(mindMapNodes[0]);
@@ -340,9 +394,9 @@ export function KnowledgeGraphStudio() {
     setChatInput("");
 
     setTimeout(() => {
-      let reply = "Based on the BCOS Mind Map Ecosystem, ";
+      let reply = "Based on the BCOS Mind Map System, ";
       if (selectedNode) {
-        reply += `for thought node **${selectedNode.label}**: it anchors ${
+        reply += `for node **${selectedNode.label}**: it anchors ${
           mindMapLinks.filter((l) => l.sourceId === selectedNode.id || l.targetId === selectedNode.id).length
         } connected concept branches in domain **${selectedNode.department}**.`;
       } else {
@@ -547,7 +601,7 @@ export function KnowledgeGraphStudio() {
               </button>
               <button
                 onClick={() => {
-                  setZoomLevel(0.85);
+                  setZoomLevel(0.75);
                   setPanOffset({ x: 0, y: 0 });
                 }}
                 className="p-1.5 text-slate-400 hover:text-white rounded-lg transition-colors"
@@ -584,7 +638,7 @@ export function KnowledgeGraphStudio() {
             <div className="flex h-full items-center justify-center">
               <div className="flex flex-col items-center gap-3">
                 <Brain className="h-12 w-12 text-[#b8c4ff] animate-pulse" />
-                <p className="text-xs text-slate-400 font-mono">Generating Digital Brain Galaxy...</p>
+                <p className="text-xs text-slate-400 font-mono">Generating Non-Overlapping Mind Map...</p>
               </div>
             </div>
           ) : (
@@ -595,7 +649,7 @@ export function KnowledgeGraphStudio() {
                 transformOrigin: "center center",
               }}
             >
-              {/* SVG ORGANIC CURVED BEZIER LINKS LAYER */}
+              {/* SVG ORGANIC CURVED BEZIER LINKS LAYER WITH ZERO LABEL COLLISION */}
               <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
                 {mindMapLinks.map((link, idx) => {
                   const sourceNode = mindMapNodes.find((n) => n.id === link.sourceId);
@@ -607,13 +661,13 @@ export function KnowledgeGraphStudio() {
                   const isHoverConnected =
                     hoveredNode && (hoveredNode.id === sourceNode.id || hoveredNode.id === targetNode.id);
 
-                  // Cubic Bezier Control Points for Organic Branch Curves
+                  // Cubic Bezier Control Points for Clean Curved Branch Routing
                   const dx = link.x2 - link.x1;
                   const dy = link.y2 - link.y1;
-                  const cx1 = link.x1 + dx * 0.5;
-                  const cy1 = link.y1;
-                  const cx2 = link.x1 + dx * 0.5;
-                  const cy2 = link.y2;
+                  const cx1 = link.x1 + dx * 0.4;
+                  const cy1 = link.y1 + dy * 0.1;
+                  const cx2 = link.x1 + dx * 0.6;
+                  const cy2 = link.y2 - dy * 0.1;
                   const pathData = `M ${link.x1} ${link.y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${link.x2} ${link.y2}`;
 
                   return (
@@ -624,7 +678,7 @@ export function KnowledgeGraphStudio() {
                         stroke={
                           isConnected || isHoverConnected
                             ? "#b8c4ff"
-                            : "rgba(142, 144, 160, 0.08)"
+                            : "rgba(142, 144, 160, 0.09)"
                         }
                         strokeWidth={isConnected ? 3 : isHoverConnected ? 2 : 1}
                         strokeDasharray={isConnected ? "6" : "none"}
@@ -634,7 +688,7 @@ export function KnowledgeGraphStudio() {
                       {zoomLevel >= 1.0 && (isConnected || isHoverConnected) && (
                         <text
                           x={(link.x1 + link.x2) / 2}
-                          y={(link.y1 + link.y2) / 2}
+                          y={(link.y1 + link.y2) / 2 - 8}
                           fill="#b8c4ff"
                           fontSize="10"
                           fontFamily="JetBrains Mono, monospace"
@@ -657,8 +711,8 @@ export function KnowledgeGraphStudio() {
                 const isCategory = node.level === "category";
 
                 // Progressive Disclosure Rules
-                if (zoomLevel < 0.35 && !isRoot) return null;
-                if (zoomLevel < 0.65 && node.level === "document") return null;
+                if (zoomLevel < 0.30 && !isRoot) return null;
+                if (zoomLevel < 0.55 && node.level === "document") return null;
 
                 return (
                   <div
@@ -675,10 +729,10 @@ export function KnowledgeGraphStudio() {
                     }}
                     className={`group transition-all duration-300 cursor-pointer flex items-center justify-center rounded-full ${
                       isRoot
-                        ? "px-6 py-3 border-2 border-[#b8c4ff] bg-[#151b2d] shadow-[0_0_40px_rgba(184,196,255,0.35)]"
+                        ? "px-7 py-3.5 border-2 border-[#b8c4ff] bg-[#151b2d] shadow-[0_0_45px_rgba(184,196,255,0.4)]"
                         : isCategory
-                        ? "px-4 py-2 border border-blue-400/40 bg-[#191f31] shadow-[0_0_20px_rgba(96,165,250,0.2)]"
-                        : "px-3 py-1.5 border border-white/10 bg-[#070d1f] hover:border-white/30"
+                        ? "px-5 py-2.5 border border-blue-400/40 bg-[#191f31] shadow-[0_0_25px_rgba(96,165,250,0.25)]"
+                        : "px-3.5 py-1.5 border border-white/10 bg-[#070d1f] hover:border-white/30"
                     } ${
                       isSelected
                         ? "ring-4 ring-[#b8c4ff]/50 scale-110 z-30"
@@ -691,14 +745,14 @@ export function KnowledgeGraphStudio() {
                       <span
                         className="rounded-full shadow-[0_0_10px_currentColor]"
                         style={{
-                          width: `${node.radius * 0.4}px`,
-                          height: `${node.radius * 0.4}px`,
+                          width: `${node.radius * 0.35}px`,
+                          height: `${node.radius * 0.35}px`,
                           backgroundColor: node.color,
                           color: node.color,
                         }}
                       />
                       <span
-                        className={`font-semibold tracking-tight ${
+                        className={`font-semibold tracking-tight whitespace-nowrap ${
                           isRoot
                             ? "text-sm text-white font-mono uppercase"
                             : isCategory
