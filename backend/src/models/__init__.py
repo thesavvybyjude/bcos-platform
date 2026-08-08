@@ -24,7 +24,9 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from ..core.database import Base
+from .audit import AuditAction, AuditLog
 from .user import APIKey, RefreshToken, User, UserRole
+from .webhook import Webhook, WebhookDelivery, WebhookEvent
 
 
 def utcnow():

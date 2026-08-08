@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from sqlalchemy import select
 
-from .api.routes import api_keys, auth, context, graph, health, modules, orchestrator, search, users
+from .api.routes import admin, api_keys, auth, context, graph, health, modules, orchestrator, search, users, webhooks
 from .config import settings
 from .core.database import async_session_maker, init_database
 from .core.logging import setup_logging
@@ -99,6 +99,7 @@ app.add_middleware(
 
 # ── Routes ──
 
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(health.router, prefix="/api/health", tags=["Health"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
@@ -108,6 +109,7 @@ app.include_router(search.router, prefix="/api/search", tags=["Search"])
 app.include_router(orchestrator.router, prefix="/api/orchestrator", tags=["Orchestrator"])
 app.include_router(context.router, prefix="/api/context", tags=["Context"])
 app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])
+app.include_router(webhooks.router, prefix="/api/webhooks", tags=["Webhooks"])
 
 
 @app.get("/", tags=["Root"])

@@ -61,6 +61,19 @@ async def compile_context(request: CompileRequest, session=Depends(get_session))
             }
         )
 
+    from ...models.webhook import WebhookEvent
+    from ...services.webhook import trigger_webhooks
+
+    await trigger_webhooks(
+        db,
+        event=WebhookEvent.CONTEXT_COMPILED,
+        payload_data={
+            "query": result.get("query"),
+            "module_count": len(serialized_modules),
+            "modules": [m["slug"] for m in serialized_modules],
+        },
+    )
+
     return {
         "query": result.get("query"),
         "compiled_markdown": result.get("compiled_markdown", ""),

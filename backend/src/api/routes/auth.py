@@ -6,6 +6,7 @@ Endpoints for registration, login, token refresh, and profile retrieval.
 
 from datetime import datetime, timedelta, timezone
 import hashlib
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
