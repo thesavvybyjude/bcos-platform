@@ -43,6 +43,7 @@ class User(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String(255), nullable=False, unique=True, index=True)
+    username = Column(String(100), nullable=True, unique=True, index=True)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(255), default="")
     role = Column(SQLEnum(UserRole, values_callable=lambda x: [e.value for e in x]), default=UserRole.VIEWER, nullable=False)
