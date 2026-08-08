@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "@/components/layout/Sidebar";
+import { AuthProvider } from "@/lib/auth-context";
 
 export const metadata: Metadata = {
   title: "BCOS Platform — Business Context Operating System",
@@ -16,15 +17,17 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen bg-surface-950">
-        <div className="flex min-h-screen">
-          {/* Sidebar */}
-          <Sidebar />
+        <AuthProvider>
+          <div className="flex min-h-screen">
+            {/* Sidebar */}
+            <Sidebar />
 
-          {/* Main content */}
-          <main className="flex-1 ml-64 min-h-screen">
-            <div className="p-8">{children}</div>
-          </main>
-        </div>
+            {/* Main content */}
+            <main className="flex-1 ml-64 min-h-screen">
+              <div className="p-8">{children}</div>
+            </main>
+          </div>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -31,11 +31,26 @@ class Settings(BaseSettings):
     DEBUG: bool = Field(default=True, validation_alias="DEBUG")
     ENVIRONMENT: str = Field(default="development", validation_alias="ENVIRONMENT")
 
-    # ── API ──
+    # ── API & Auth ──
     API_PREFIX: str = "/api"
     CORS_ORIGINS: List[str] = Field(
         default=["http://localhost:3000", "http://localhost:8000"],
         validation_alias="CORS_ORIGINS",
+    )
+    SECRET_KEY: str = Field(
+        default="bcos_super_secret_jwt_key_change_in_production_32bytesmin",
+        validation_alias="SECRET_KEY",
+    )
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day default
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    FIRST_SUPERUSER_EMAIL: str = Field(
+        default="admin@bcos.local",
+        validation_alias="FIRST_SUPERUSER_EMAIL",
+    )
+    FIRST_SUPERUSER_PASSWORD: str = Field(
+        default="Admin123!",
+        validation_alias="FIRST_SUPERUSER_PASSWORD",
     )
 
     # ── PostgreSQL / SQLite ──

@@ -25,6 +25,10 @@ dependencies = [
     "chromadb>=0.4.24",
     "neo4j>=5.19.0",
     "redis>=5.0.3",
+    "pyjwt>=2.8.0",
+    "passlib[bcrypt]>=1.7.4",
+    "bcrypt>=4.0.1",
+    "email-validator>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -42,6 +46,7 @@ where = ["."]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 target-version = "py310"

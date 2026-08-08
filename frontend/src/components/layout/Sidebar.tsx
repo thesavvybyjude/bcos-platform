@@ -37,14 +37,18 @@ const collectionItems = [
 ];
 
 const systemItems = [
-  { href: "/settings", label: "Settings", icon: Settings },
-  { href: "/integrations", label: "Integrations", icon: Sliders },
-  { href: "/users", label: "Users", icon: Users },
-  { href: "/logs", label: "Logs", icon: Terminal },
+  { href: "/modules", label: "Settings", icon: Settings },
+  { href: "/orchestrator", label: "Integrations", icon: Sliders },
+  { href: "/search", label: "Users", icon: Users },
+  { href: "/context", label: "Logs", icon: Terminal },
 ];
+
+import { useAuth } from "@/lib/auth-context";
+import { LogOut, LogIn, Shield, User } from "lucide-react";
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-white/5 bg-[#0c1324]/95 backdrop-blur-2xl select-none">
@@ -96,6 +100,28 @@ export default function Sidebar() {
           </div>
         </div>
 
+        {/* Administration link (if Admin) */}
+        {user && (user.is_superuser || user.role === "admin") && (
+          <div>
+            <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-amber-400/90 font-mono">
+              Administration
+            </p>
+            <div className="space-y-1">
+              <Link
+                href="/admin/users"
+                className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium transition-all ${
+                  pathname === "/admin/users"
+                    ? "bg-indigo-600/20 text-indigo-300 ring-1 ring-indigo-500/30 font-semibold"
+                    : "text-slate-300 hover:bg-white/[0.03] hover:text-white"
+                }`}
+              >
+                <Shield className="h-4 w-4 text-indigo-400" />
+                User & API Keys
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* Collections */}
         <div>
           <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400 font-mono">
@@ -120,37 +146,46 @@ export default function Sidebar() {
             })}
           </div>
         </div>
-
-        {/* System */}
-        <div>
-          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400 font-mono">
-            System
-          </p>
-          <div className="space-y-1">
-            {systemItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  className="group flex items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-slate-400 hover:bg-white/[0.03] hover:text-white transition-all"
-                >
-                  <Icon className="h-4 w-4 text-slate-400 group-hover:text-slate-200" />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
       </div>
 
-      {/* Footer */}
-      <div className="border-t border-white/5 p-4">
-        <div className="flex items-center gap-2 text-xs text-slate-400 font-mono">
+      {/* Footer / User Session */}
+      <div className="border-t border-white/5 p-4 space-y-3">
+        {user ? (
+          <div className="flex items-center justify-between gap-2 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800">
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 flex items-center justify-center text-xs font-bold shrink-0">
+                {user.full_name ? user.full_name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
+              </div>
+              <div className="overflow-hidden">
+                <p className="text-xs font-semibold text-slate-200 truncate">
+                  {user.full_name || user.email}
+                </p>
+                <span className="text-[10px] text-indigo-400 font-mono capitalize">
+                  {user.role}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={logout}
+              title="Sign Out"
+              className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
+        ) : (
+          <Link
+            href="/login"
+            className="flex items-center justify-center gap-2 py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs rounded-xl shadow-md transition-all"
+          >
+            <LogIn className="w-4 h-4" /> Sign In
+          </Link>
+        )}
+
+        <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono px-1">
           <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
           <span>System Operational</span>
         </div>
-        <p className="mt-1 text-[10px] text-slate-400 font-mono">BCOS v1.0.0</p>
       </div>
     </aside>
   );

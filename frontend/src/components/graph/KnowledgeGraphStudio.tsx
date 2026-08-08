@@ -49,6 +49,7 @@ import {
   Compass,
 } from "lucide-react";
 import { type GraphData, type GraphNode, type GraphLink, api } from "@/lib/api";
+import { MarkdownReaderModal } from "@/components/common/MarkdownReaderModal";
 
 interface MindMapNode extends GraphNode {
   x: number;
@@ -58,6 +59,7 @@ interface MindMapNode extends GraphNode {
   color: string;
   clusterId: string;
   icon?: any;
+  slug?: string;
 }
 
 interface MindMapLink {
@@ -77,6 +79,10 @@ export function KnowledgeGraphStudio() {
   // Data State from Real Database API
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Markdown Modal State
+  const [modalSlug, setModalSlug] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Interaction State
   const [searchQuery, setSearchQuery] = useState("");
@@ -127,6 +133,7 @@ export function KnowledgeGraphStudio() {
         searchInputRef.current?.focus();
       } else if (e.key === "Escape") {
         setHoveredNode(null);
+        setIsModalOpen(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -159,6 +166,7 @@ export function KnowledgeGraphStudio() {
       label: "BCOS Knowledge Platform",
       type: "department",
       department: "Core Operating System",
+      slug: "overview",
       x: centerCanvasX,
       y: centerCanvasY,
       radius: 55,
@@ -197,6 +205,7 @@ export function KnowledgeGraphStudio() {
         label: dept,
         type: "department",
         department: dept,
+        slug: dept,
         x: deptX,
         y: deptY,
         radius: 36,
@@ -232,6 +241,7 @@ export function KnowledgeGraphStudio() {
 
         nodes.push({
           ...mod,
+          slug: mod.label,
           x: leafX,
           y: leafY,
           radius: 20,
@@ -281,7 +291,6 @@ export function KnowledgeGraphStudio() {
     setSelectedNode(node);
     if (!canvasRef.current) return;
 
-    // Calculate center offset for target node
     const targetZoom = 0.85;
     const canvasWidth = canvasRef.current.clientWidth || 1000;
     const canvasHeight = canvasRef.current.clientHeight || 700;
@@ -292,6 +301,11 @@ export function KnowledgeGraphStudio() {
     setPanOffset({ x: newPanX, y: newPanY });
     setZoomLevel(targetZoom);
   }, []);
+
+  const openMarkdownModalForNode = (node: MindMapNode) => {
+    setModalSlug(node.slug || node.label || node.id);
+    setIsModalOpen(true);
+  };
 
   // Handle Search Submit / Focus
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -371,6 +385,13 @@ export function KnowledgeGraphStudio() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] w-full overflow-hidden bg-[#0c1324] text-[#dce1fb] rounded-2xl border border-white/5 shadow-2xl relative select-none">
+      {/* Markdown Reader Modal */}
+      <MarkdownReaderModal
+        slug={modalSlug}
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
+
       {/* ── 1. LEFT FLOATING TOOL DOCK ── */}
       <div className="absolute top-20 left-4 z-30 flex flex-col items-center gap-1.5 p-1.5 rounded-2xl bg-[#151b2d]/90 backdrop-blur-2xl border border-white/10 shadow-2xl">
         <button
@@ -604,6 +625,7 @@ export function KnowledgeGraphStudio() {
                   <div
                     key={node.id}
                     onClick={() => focusCameraOnNode(node)}
+                    onDoubleClick={() => openMarkdownModalForNode(node)}
                     onMouseEnter={() => setHoveredNode(node)}
                     onMouseLeave={() => setHoveredNode(null)}
                     style={{
@@ -799,14 +821,24 @@ export function KnowledgeGraphStudio() {
                     </div>
                   </div>
 
-                  {/* Primary CTA Button: Open in Knowledge Base */}
-                  <button
-                    onClick={() => router.push(`/modules?search=${encodeURIComponent(selectedNode?.label || "")}`)}
-                    className="w-full py-3 px-4 rounded-xl bg-[#b8c4ff] text-[#002585] font-bold text-xs flex items-center justify-center gap-2 hover:bg-white shadow-[0_0_20px_rgba(184,196,255,0.3)] transition-all"
-                  >
-                    <span>Open in Knowledge Base</span>
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </button>
+                  {/* Primary CTA Buttons: Read Markdown File Modal & Open in Knowledge Base */}
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => selectedNode && openMarkdownModalForNode(selectedNode)}
+                      className="w-full py-3 px-4 rounded-xl bg-[#6b89ff] text-white font-bold text-xs flex items-center justify-center gap-2 hover:bg-[#b8c4ff] hover:text-[#002585] shadow-[0_0_20px_rgba(107,137,255,0.3)] transition-all"
+                    >
+                      <FileText className="h-4 w-4" />
+                      <span>View Formatted Markdown File</span>
+                    </button>
+
+                    <button
+                      onClick={() => router.push(`/modules?search=${encodeURIComponent(selectedNode?.label || "")}`)}
+                      className="w-full py-2.5 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold text-xs flex items-center justify-center gap-2 border border-white/10 transition-all"
+                    >
+                      <span>Open in Knowledge Base Directory</span>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </>
               )}
             </div>

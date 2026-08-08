@@ -10,13 +10,36 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api.routes import context, graph, health, modules, orchestrator, search
+from sqlalchemy import select
+
+from .api.routes import api_keys, auth, context, graph, health, modules, orchestrator, search, users
 from .config import settings
-from .core.database import init_database
+from .core.database import async_session_maker, init_database
 from .core.logging import setup_logging
+from .core.security import get_password_hash
+from .models.user import User, UserRole
 
 # Initialize logging
 logger = setup_logging("DEBUG" if settings.DEBUG else "INFO")
+
+
+async def init_superuser():
+    """Bootstrap default superuser if database has no users."""
+    async with async_session_maker() as db:
+        res = await db.execute(select(User).limit(1))
+        existing_user = res.scalar_one_or_none()
+        if not existing_user and settings.FIRST_SUPERUSER_EMAIL:
+            admin = User(
+                email=settings.FIRST_SUPERUSER_EMAIL.lower(),
+                hashed_password=get_password_hash(settings.FIRST_SUPERUSER_PASSWORD),
+                full_name="System Admin",
+                role=UserRole.ADMIN,
+                is_superuser=True,
+                is_active=True,
+            )
+            db.add(admin)
+            await db.commit()
+            logger.info("Created initial superuser", email=settings.FIRST_SUPERUSER_EMAIL)
 
 
 @asynccontextmanager
@@ -32,6 +55,9 @@ async def lifespan(app: FastAPI):
     # Initialize database tables
     await init_database()
     logger.info("Database initialized")
+
+    # Bootstrap default superuser
+    await init_superuser()
 
     # Log knowledge base path
     logger.info("Knowledge base path", path=settings.KNOWLEDGE_BASE_PATH)
@@ -74,6 +100,9 @@ app.add_middleware(
 # ── Routes ──
 
 app.include_router(health.router, prefix="/api/health", tags=["Health"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(users.router, prefix="/api/users", tags=["Users"])
+app.include_router(api_keys.router, prefix="/api/api-keys", tags=["API Keys"])
 app.include_router(modules.router, prefix="/api/modules", tags=["Modules"])
 app.include_router(search.router, prefix="/api/search", tags=["Search"])
 app.include_router(orchestrator.router, prefix="/api/orchestrator", tags=["Orchestrator"])

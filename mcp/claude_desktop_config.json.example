@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "bcos-platform": {
+      "command": "python",
+      "args": [
+        "C:/Users/thesa/OneDrive/Documents/ideation_files, pre_builds/BCOS/mcp/server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "C:/Users/thesa/OneDrive/Documents/ideation_files, pre_builds/BCOS/backend"
+      }
+    }
+  }
+}
