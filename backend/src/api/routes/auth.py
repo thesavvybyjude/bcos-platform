@@ -164,3 +164,53 @@ async def get_me(
     Get profile information for the currently authenticated user.
     """
     return current_user
+
+
+@router.put("/me", response_model=UserRead)
+async def update_me(
+    full_name: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Update profile details for the currently logged-in user.
+    """
+    if full_name is not None:
+        current_user.full_name = full_name
+    await db.commit()
+    await db.refresh(current_user)
+    return current_user
+
+
+@router.post("/change-password", status_code=status.HTTP_200_OK)
+async def change_password(
+    old_password: str,
+    new_password: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Change password for currently authenticated user.
+    """
+    if not verify_password(old_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect current password")
+    current_user.hashed_password = get_password_hash(new_password)
+    await db.commit()
+    return {"status": "password updated successfully"}
+
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+async def logout(
+    req: TokenRefreshRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Invalidate refresh token session.
+    """
+    token_hash = hashlib.sha256(req.refresh_token.encode("utf-8")).hexdigest()
+    result = await db.execute(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
+    token_entry = result.scalar_one_or_none()
+    if token_entry:
+        token_entry.revoked = True
+        await db.commit()
+    return {"status": "logged out successfully"}
