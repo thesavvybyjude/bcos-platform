@@ -7,12 +7,13 @@ Endpoints for registration, login, token refresh, and profile retrieval.
 from datetime import datetime, timedelta, timezone
 import hashlib
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...config import settings
 from ...core.database import get_db
+from ...core.rate_limit import limiter
 from ...core.security import (
     create_access_token,
     create_refresh_token,
@@ -22,10 +23,12 @@ from ...core.security import (
 )
 from ...models.user import RefreshToken, User, UserRole
 from ...schemas.auth import (
+    ChangePasswordRequest,
     LoginRequest,
     RegisterRequest,
     Token,
     TokenRefreshRequest,
+    UpdateProfileRequest,
     UserRead,
 )
 from ..deps import get_current_user
@@ -33,8 +36,10 @@ from ..deps import get_current_user
 router = APIRouter()
 
 
-@router.post("/register", response_model=UserRead, status_code=status.HTTP_211_CREATED if hasattr(status, 'HTTP_211_CREATED') else 201)
+@router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")
 async def register(
+    request: Request,
     req: RegisterRequest,
     db: AsyncSession = Depends(get_db),
 ):
@@ -70,7 +75,9 @@ async def register(
 
 
 @router.post("/login", response_model=Token)
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     req: LoginRequest,
     db: AsyncSession = Depends(get_db),
 ):
@@ -117,7 +124,9 @@ async def login(
 
 
 @router.post("/refresh", response_model=Token)
+@limiter.limit("20/minute")
 async def refresh_token(
+    request: Request,
     req: TokenRefreshRequest,
     db: AsyncSession = Depends(get_db),
 ):
@@ -169,33 +178,34 @@ async def get_me(
 
 @router.put("/me", response_model=UserRead)
 async def update_me(
-    full_name: Optional[str] = None,
+    req: UpdateProfileRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Update profile details for the currently logged-in user.
     """
-    if full_name is not None:
-        current_user.full_name = full_name
+    if req.full_name is not None:
+        current_user.full_name = req.full_name
     await db.commit()
     await db.refresh(current_user)
     return current_user
 
 
 @router.post("/change-password", status_code=status.HTTP_200_OK)
+@limiter.limit("5/minute")
 async def change_password(
-    old_password: str,
-    new_password: str,
+    request: Request,
+    req: ChangePasswordRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Change password for currently authenticated user.
     """
-    if not verify_password(old_password, current_user.hashed_password):
+    if not verify_password(req.old_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect current password")
-    current_user.hashed_password = get_password_hash(new_password)
+    current_user.hashed_password = get_password_hash(req.new_password)
     await db.commit()
     return {"status": "password updated successfully"}
 

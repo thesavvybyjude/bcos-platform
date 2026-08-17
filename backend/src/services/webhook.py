@@ -28,8 +28,14 @@ async def deliver_webhook(
     event: str,
     payload: Dict[str, Any],
 ) -> WebhookDelivery:
-    """Deliver webhook payload via HTTP POST with HMAC signature header."""
-    signature = sign_payload(payload, webhook.secret)
+    """Deliver webhook payload via HTTP POST with HMAC signature header.
+
+    Signs with `webhook.secret_hash`, not a raw secret — the raw secret is
+    never stored (SEC-011), only shown once at creation time. Using the
+    hash as the HMAC key is safe: HMAC just needs a consistent, unguessable
+    key, not a reversible one.
+    """
+    signature = sign_payload(payload, webhook.secret_hash)
     headers = {
         "Content-Type": "application/json",
         "X-BCOS-Event": event,

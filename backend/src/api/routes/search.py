@@ -48,6 +48,12 @@ async def search(
     mod_result = await session.execute(mod_stmt)
     matched_modules = mod_result.scalars().all()
 
+    # Batch-fetch principle/rule/decision-tree counts for all matched modules
+    # in one query instead of 3 queries per module (BUG-005, same fix as BUG-004).
+    counts_by_id = await _batch_module_counts(
+        session, [mod.id for mod in matched_modules]
+    )
+
     for mod in matched_modules:
         # Compute a naive relevance score
         score = 0.0
@@ -62,18 +68,7 @@ async def search(
         # Extract a snippet from raw_content
         snippet = _extract_snippet(mod.raw_content, q, max_length=200)
 
-        # Get counts
-        p_count = await session.scalar(
-            select(func.count(Principle.id)).where(Principle.module_id == mod.id)
-        )
-        r_count = await session.scalar(
-            select(func.count(Rule.id)).where(Rule.module_id == mod.id)
-        )
-        dt_count = await session.scalar(
-            select(func.count(DecisionTree.id)).where(
-                DecisionTree.module_id == mod.id
-            )
-        )
+        p_count, r_count, dt_count = counts_by_id.get(mod.id, (0, 0, 0))
 
         results.append(
             SearchResult(
@@ -110,16 +105,29 @@ async def search(
     matched_principles = p_result.scalars().all()
 
     seen_module_ids = {r.module.id for r in results}
-    for p in matched_principles:
-        if p.module_id not in seen_module_ids:
-            # Fetch the parent module
-            mod = await session.get(Module, p.module_id)
+    unseen_module_ids = {
+        p.module_id for p in matched_principles if p.module_id not in seen_module_ids
+    }
+
+    if unseen_module_ids:
+        # Batch-fetch parent modules in one query instead of session.get() per
+        # principle (the other half of BUG-005).
+        parent_modules_result = await session.execute(
+            select(Module).where(Module.id.in_(unseen_module_ids))
+        )
+        parent_modules_by_id = {
+            m.id: m for m in parent_modules_result.scalars().all()
+        }
+        parent_counts_by_id = await _batch_module_counts(
+            session, list(parent_modules_by_id.keys())
+        )
+
+        for p in matched_principles:
+            if p.module_id in seen_module_ids:
+                continue
+            mod = parent_modules_by_id.get(p.module_id)
             if mod:
-                p_count = await session.scalar(
-                    select(func.count(Principle.id)).where(
-                        Principle.module_id == mod.id
-                    )
-                )
+                p_count, _, _ = parent_counts_by_id.get(mod.id, (0, 0, 0))
                 results.append(
                     SearchResult(
                         module=ModuleSummary(
@@ -147,6 +155,37 @@ async def search(
         total=len(results),
         results=results,
     )
+
+
+async def _batch_module_counts(session: AsyncSession, module_ids: list) -> dict:
+    """Fetch principle/rule/decision-tree counts for a set of module IDs in a
+    single query, instead of 3 queries per module (BUG-004/BUG-005)."""
+    if not module_ids:
+        return {}
+
+    p_count_sq = (
+        select(func.count(Principle.id))
+        .where(Principle.module_id == Module.id)
+        .correlate(Module)
+        .scalar_subquery()
+    )
+    r_count_sq = (
+        select(func.count(Rule.id))
+        .where(Rule.module_id == Module.id)
+        .correlate(Module)
+        .scalar_subquery()
+    )
+    dt_count_sq = (
+        select(func.count(DecisionTree.id))
+        .where(DecisionTree.module_id == Module.id)
+        .correlate(Module)
+        .scalar_subquery()
+    )
+    stmt = select(Module.id, p_count_sq, r_count_sq, dt_count_sq).where(
+        Module.id.in_(module_ids)
+    )
+    result = await session.execute(stmt)
+    return {mod_id: (p, r, dt) for mod_id, p, r, dt in result.all()}
 
 
 def _extract_snippet(content: str, query: str, max_length: int = 200) -> str:

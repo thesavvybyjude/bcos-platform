@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import Column, DateTime, Enum as SQLEnum, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from ..core.types import GUID
 
 from ..core.database import Base
 
@@ -40,8 +40,8 @@ class AuditLog(Base):
 
     __tablename__ = "audit_logs"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), nullable=True)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id = Column(GUID(), nullable=True)
     user_email = Column(String(255), default="system")
     action = Column(SQLEnum(AuditAction, values_callable=lambda x: [e.value for e in x]), nullable=False)
     target_slug = Column(String(500), nullable=True)

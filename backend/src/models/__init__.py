@@ -20,7 +20,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID
+from ..core.types import GUID
 from sqlalchemy.orm import relationship
 
 from ..core.database import Base
@@ -41,7 +41,7 @@ class Module(Base):
 
     __tablename__ = "modules"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     name = Column(String(500), nullable=False)
     slug = Column(String(500), nullable=False, unique=True, index=True)
     department = Column(String(200), nullable=False, index=True)
@@ -88,9 +88,9 @@ class Principle(Base):
 
     __tablename__ = "principles"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     module_id = Column(
-        UUID(as_uuid=True), ForeignKey("modules.id", ondelete="CASCADE"), nullable=False
+        GUID(), ForeignKey("modules.id", ondelete="CASCADE"), nullable=False
     )
     title = Column(String(500), nullable=False)
     description = Column(Text, nullable=False)
@@ -112,9 +112,9 @@ class Rule(Base):
 
     __tablename__ = "rules"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     module_id = Column(
-        UUID(as_uuid=True), ForeignKey("modules.id", ondelete="CASCADE"), nullable=False
+        GUID(), ForeignKey("modules.id", ondelete="CASCADE"), nullable=False
     )
     rule_type = Column(String(50), nullable=False)  # Always | Never | Avoid | Prefer
     statement = Column(Text, nullable=False)
@@ -138,9 +138,9 @@ class DecisionTree(Base):
 
     __tablename__ = "decision_trees"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     module_id = Column(
-        UUID(as_uuid=True), ForeignKey("modules.id", ondelete="CASCADE"), nullable=False
+        GUID(), ForeignKey("modules.id", ondelete="CASCADE"), nullable=False
     )
     name = Column(String(500), nullable=False)
     condition = Column(Text, nullable=False)
@@ -164,9 +164,9 @@ class CrossReference(Base):
 
     __tablename__ = "cross_references"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     source_module_id = Column(
-        UUID(as_uuid=True), ForeignKey("modules.id", ondelete="CASCADE"), nullable=False
+        GUID(), ForeignKey("modules.id", ondelete="CASCADE"), nullable=False
     )
     target_module_slug = Column(String(500), nullable=False)
     relationship_type = Column(

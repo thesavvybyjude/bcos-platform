@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.database import get_db
+from ...core.security import hash_webhook_secret
 from ...models import User, UserRole
 from ...models.webhook import Webhook, WebhookDelivery, WebhookEvent
 from ...services.webhook import deliver_webhook, trigger_webhooks
@@ -41,7 +42,13 @@ class WebhookRead(BaseModel):
         from_attributes = True
 
 
-@router.post("/", response_model=WebhookRead, status_code=status.HTTP_201_CREATED)
+class WebhookCreatedResponse(WebhookRead):
+    """Returned ONLY from the create endpoint — the raw secret is shown
+    once and never stored or retrievable again (SEC-011)."""
+    raw_secret: str
+
+
+@router.post("/", response_model=WebhookCreatedResponse, status_code=status.HTTP_201_CREATED)
 async def register_webhook(
     req: WebhookCreate,
     db: AsyncSession = Depends(get_db),
@@ -49,18 +56,29 @@ async def register_webhook(
 ):
     """
     Register a new webhook subscription (Admin only).
+
+    The response includes `raw_secret` ONCE — save it now. Only its hash
+    is stored; it cannot be retrieved again after this response (SEC-011).
     """
-    secret = req.secret or secrets.token_hex(24)
+    raw_secret = req.secret or secrets.token_hex(24)
     wh = Webhook(
         name=req.name,
         url=str(req.url),
         event=req.event,
-        secret=secret,
+        secret_hash=hash_webhook_secret(raw_secret),
     )
     db.add(wh)
     await db.commit()
     await db.refresh(wh)
-    return wh
+    return WebhookCreatedResponse(
+        id=wh.id,
+        name=wh.name,
+        url=wh.url,
+        event=wh.event,
+        is_active=wh.is_active,
+        last_triggered_at=wh.last_triggered_at.isoformat() if wh.last_triggered_at else None,
+        raw_secret=raw_secret,
+    )
 
 
 @router.get("/", response_model=List[WebhookRead])

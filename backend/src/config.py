@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day default
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # SEC-007: rate limiting. None = in-process memory (fine for a single
+    # worker; does not share state across workers/replicas). Set to e.g.
+    # "redis://localhost:6379/0" for multi-worker/multi-pod deployments.
+    RATE_LIMIT_STORAGE_URI: Optional[str] = None
     FIRST_SUPERUSER_EMAIL: str = Field(
         default="admin@bcos.local",
         validation_alias="FIRST_SUPERUSER_EMAIL",

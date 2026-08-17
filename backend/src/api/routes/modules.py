@@ -44,22 +44,45 @@ async def list_modules(
     result = await session.execute(stmt)
     modules = result.scalars().all()
 
-    # Enrich with counts
+    if not modules:
+        return []
+
+    module_ids = [mod.id for mod in modules]
+
+    # Single aggregated count query instead of 3 queries per module (BUG-004).
+    # Each count is computed as a correlated scalar subquery rather than a
+    # join+group-by, which avoids the row-multiplication (and therefore
+    # inflated counts) that a naive multi-table outer join would produce
+    # when a module has, say, 5 principles and 3 rules.
+    p_count_sq = (
+        select(func.count(Principle.id))
+        .where(Principle.module_id == Module.id)
+        .correlate(Module)
+        .scalar_subquery()
+    )
+    r_count_sq = (
+        select(func.count(Rule.id))
+        .where(Rule.module_id == Module.id)
+        .correlate(Module)
+        .scalar_subquery()
+    )
+    dt_count_sq = (
+        select(func.count(DecisionTree.id))
+        .where(DecisionTree.module_id == Module.id)
+        .correlate(Module)
+        .scalar_subquery()
+    )
+    counts_stmt = select(
+        Module.id, p_count_sq, r_count_sq, dt_count_sq
+    ).where(Module.id.in_(module_ids))
+    counts_result = await session.execute(counts_stmt)
+    counts_by_id = {
+        mod_id: (p, r, dt) for mod_id, p, r, dt in counts_result.all()
+    }
+
     summaries = []
     for mod in modules:
-        # Get counts efficiently
-        p_count = await session.scalar(
-            select(func.count(Principle.id)).where(Principle.module_id == mod.id)
-        )
-        r_count = await session.scalar(
-            select(func.count(Rule.id)).where(Rule.module_id == mod.id)
-        )
-        dt_count = await session.scalar(
-            select(func.count(DecisionTree.id)).where(
-                DecisionTree.module_id == mod.id
-            )
-        )
-
+        p_count, r_count, dt_count = counts_by_id.get(mod.id, (0, 0, 0))
         summaries.append(
             ModuleSummary(
                 id=mod.id,

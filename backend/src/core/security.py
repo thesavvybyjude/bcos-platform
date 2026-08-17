@@ -120,3 +120,16 @@ def generate_api_key() -> Tuple[str, str, str]:
 def hash_api_key(raw_key: str) -> str:
     """Compute SHA256 hash of raw API key for DB lookup."""
     return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+
+
+def hash_webhook_secret(raw_secret: str) -> str:
+    """SEC-011: compute SHA256 hash of a webhook secret for storage at rest.
+
+    The raw secret is shown to the admin ONCE at creation time and never
+    stored. The hash itself is used as the HMAC signing key for all future
+    deliveries (see services/webhook.py) — this is safe because HMAC only
+    requires a consistent, unguessable key; it does not require the key to
+    be reversible, so a one-way hash works fine as the signing key without
+    ever needing to recover the original raw secret.
+    """
+    return hashlib.sha256(raw_secret.encode("utf-8")).hexdigest()

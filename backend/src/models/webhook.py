@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, Column, DateTime, Enum as SQLEnum, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from ..core.types import GUID
 from sqlalchemy.orm import relationship
 
 from ..core.database import Base
@@ -37,11 +37,11 @@ class Webhook(Base):
 
     __tablename__ = "webhooks"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
     name = Column(String(255), nullable=False)
     url = Column(String(1024), nullable=False)
     event = Column(SQLEnum(WebhookEvent, values_callable=lambda x: [e.value for e in x]), nullable=False)
-    secret = Column(String(255), nullable=False)
+    secret_hash = Column(String(255), nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
 
     created_at = Column(DateTime(timezone=True), default=utcnow)
@@ -61,8 +61,8 @@ class WebhookDelivery(Base):
 
     __tablename__ = "webhook_deliveries"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    webhook_id = Column(UUID(as_uuid=True), ForeignKey("webhooks.id", ondelete="CASCADE"), nullable=False)
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4)
+    webhook_id = Column(GUID(), ForeignKey("webhooks.id", ondelete="CASCADE"), nullable=False)
     event = Column(String(100), nullable=False)
     payload = Column(Text, nullable=False)
     status_code = Column(Integer, nullable=True)
