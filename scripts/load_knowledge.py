@@ -63,7 +63,18 @@ async def load_knowledge(force: bool = False):
     async_session_factory = core.database.async_session
 
     async with async_session_factory() as session:
-        from sqlalchemy import delete
+        from sqlalchemy import delete, func, select
+
+        existing_count = await session.scalar(select(func.count(Module.id)))
+        if existing_count and not force:
+            print(
+                f"  [ABORT] {existing_count} modules already exist in the database.\n"
+                f"          Re-running the loader deletes ALL existing modules, "
+                f"principles, rules, decision trees, and cross-references first.\n"
+                f"          Pass --force to confirm you want to wipe and reload."
+            )
+            return
+
         await session.execute(delete(CrossReference))
         await session.execute(delete(DecisionTree))
         await session.execute(delete(Rule))

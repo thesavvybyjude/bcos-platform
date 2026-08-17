@@ -10,8 +10,8 @@ export interface User {
   email: string;
   full_name?: string;
   role: UserRole;
-  is_active: bool;
-  is_superuser: bool;
+  is_active: boolean;
+  is_superuser: boolean;
   created_at: string;
   updated_at: string;
   last_login_at?: string;
@@ -21,8 +21,8 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  login: (email: string, password: str) => Promise<void>;
-  register: (email: string, password: str, full_name?: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, full_name?: string) => Promise<void>;
   logout: () => void;
   refreshProfile: () => Promise<void>;
   hasRole: (allowed: UserRole[]) => boolean;
@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshProfile();
   }, []);
 
-  const login = async (email: string, password: str) => {
+  const login = async (email: string, password: string) => {
     const data = await apiRequest<{
       access_token: string;
       refresh_token: string;
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await refreshProfile();
   };
 
-  const register = async (email: string, password: str, full_name?: string) => {
+  const register = async (email: string, password: string, full_name?: string) => {
     await apiRequest("/api/auth/register", {
       method: "POST",
       body: JSON.stringify({ email, password, full_name }),

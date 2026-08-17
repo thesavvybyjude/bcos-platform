@@ -42,10 +42,26 @@ async def init_superuser():
             logger.info("Created initial superuser", email=settings.FIRST_SUPERUSER_EMAIL)
 
 
+_INSECURE_SECRET_KEY_MARKERS = ("change_me", "change_in_production", "changeme")
+
+
+def _validate_secrets():
+    """Refuse to start with a placeholder/weak SECRET_KEY."""
+    key = settings.SECRET_KEY or ""
+    if len(key) < 32 or any(m in key.lower() for m in _INSECURE_SECRET_KEY_MARKERS):
+        raise RuntimeError(
+            "SECRET_KEY is missing, too short, or still a placeholder value. "
+            "Set SECRET_KEY to a random string of at least 32 characters "
+            "(e.g. `python -c \"import secrets; print(secrets.token_urlsafe(48))\"`)."
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifecycle: startup and shutdown hooks."""
     # ── Startup ──
+    _validate_secrets()
+
     logger.info(
         "Starting BCOS Platform",
         version=settings.APP_VERSION,

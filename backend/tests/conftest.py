@@ -4,7 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pytest
-from httpx import AsyncClient
+from httpx import AsyncClient, ASGITransport
 from src.main import app
 
 
@@ -15,5 +15,6 @@ def anyio_backend():
 
 @pytest.fixture
 async def async_client():
-    async with AsyncClient(app=app, base_url="http://testserver") as client:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         yield client

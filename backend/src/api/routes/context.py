@@ -4,7 +4,7 @@ BCOS Platform — Context Compilation Routes
 Compiles AI-ready context packages from modules.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from ...core.database import get_session
 from ...schemas import CompileRequest, CompiledContext
@@ -40,11 +40,9 @@ async def compile_context(request: CompileRequest, session=Depends(get_session))
             output_format=request.output_format,
         )
     else:
-        return {
-            "error": "Provide either 'query' or 'module_slugs'.",
-            "compiled_markdown": "",
-            "modules": [],
-        }
+        raise HTTPException(
+            status_code=400, detail="Provide either 'query' or 'module_slugs'."
+        )
 
     # Serialize modules to dict (can't return SQLAlchemy objects directly)
     serialized_modules = []
@@ -65,7 +63,7 @@ async def compile_context(request: CompileRequest, session=Depends(get_session))
     from ...services.webhook import trigger_webhooks
 
     await trigger_webhooks(
-        db,
+        session,
         event=WebhookEvent.CONTEXT_COMPILED,
         payload_data={
             "query": result.get("query"),

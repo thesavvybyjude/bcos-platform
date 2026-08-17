@@ -38,7 +38,7 @@ class Settings(BaseSettings):
         validation_alias="CORS_ORIGINS",
     )
     SECRET_KEY: str = Field(
-        default="bcos_super_secret_jwt_key_change_in_production_32bytesmin",
+        ...,  # Required — no insecure default. Set via SECRET_KEY env var.
         validation_alias="SECRET_KEY",
     )
     JWT_ALGORITHM: str = "HS256"
@@ -49,7 +49,7 @@ class Settings(BaseSettings):
         validation_alias="FIRST_SUPERUSER_EMAIL",
     )
     FIRST_SUPERUSER_PASSWORD: str = Field(
-        default="Admin123!",
+        ...,  # Required — no insecure default. Set via FIRST_SUPERUSER_PASSWORD env var.
         validation_alias="FIRST_SUPERUSER_PASSWORD",
     )
 
@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     # ── Neo4j (Graph DB) ──
     NEO4J_URI: Optional[str] = Field(default="bolt://localhost:7687", validation_alias="NEO4J_URI")
     NEO4J_USER: Optional[str] = Field(default="neo4j", validation_alias="NEO4J_USER")
-    NEO4J_PASSWORD: Optional[str] = Field(default="bcos_neo4j_secret", validation_alias="NEO4J_PASSWORD")
+    NEO4J_PASSWORD: Optional[str] = Field(default=None, validation_alias="NEO4J_PASSWORD")
 
     # ── OpenAI (optional — disabled by default) ──
     OPENAI_API_KEY: Optional[str] = Field(default=None, validation_alias="OPENAI_API_KEY")

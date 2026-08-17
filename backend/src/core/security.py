@@ -19,22 +19,19 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a plain password against a hashed password."""
-    try:
-        return pwd_context.verify(plain_password, hashed_password)
-    except Exception:
-        # Fallback to SHA256 comparison if passlib compatibility fails
-        fallback_hash = hashlib.sha256(plain_password.encode("utf-8")).hexdigest()
-        return secrets.compare_digest(fallback_hash, hashed_password)
+    """Verify a plain password against a hashed password.
+
+    Never falls back to a fast hash (e.g. SHA-256) — if bcrypt verification
+    fails for a reason other than a genuine mismatch, that error should
+    propagate rather than silently downgrading password security.
+    """
+    return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
-    """Generate bcrypt password hash."""
-    try:
-        return pwd_context.hash(password)
-    except Exception:
-        # Fallback hash
-        return hashlib.sha256(password.encode("utf-8")).hexdigest()
+    """Generate bcrypt password hash. Raises if bcrypt is unavailable —
+    never falls back to a fast, crackable hash."""
+    return pwd_context.hash(password)
 
 
 def create_access_token(

@@ -1,47 +1,36 @@
 """
-BCOS Platform — Database Engine
+BCOS Platform — Core Package
 
-Async SQLAlchemy engine with PostgreSQL (asyncpg).
-Provides session factory and Base for all models.
+Re-exports the single source of truth for the DB engine, session factory,
+and declarative Base from `core.database`. This package used to define its
+own separate engine/Base here, which caused two problems:
+  1. Two competing `Base` classes existed (ARCH-001) — models attach to
+     `database.Base`, so anything relying on this module's `Base` silently
+     had zero tables registered on it.
+  2. This file constructed its engine eagerly at import time with
+     `pool_size`/`max_overflow` kwargs that are invalid for SQLite's
+     QueuePool-less engine — and because importing `core.database` always
+     executes `core/__init__.py` first, this crashed the app on startup
+     for any SQLite-backed environment (e.g. local dev), regardless of
+     whether this module's engine was ever actually used.
 """
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import DeclarativeBase
-
-from ..config import settings
-
-# Create async engine
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,
-    pool_size=20,
-    max_overflow=10,
-    pool_pre_ping=True,
-)
-
-# Session factory
-async_session = async_sessionmaker(
+from .database import (
+    Base,
     engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
+    async_session,
+    async_session_maker,
+    get_session,
+    get_db,
+    init_database,
 )
 
-
-class Base(DeclarativeBase):
-    """Base class for all SQLAlchemy models."""
-    pass
-
-
-async def init_database():
-    """Create all tables. In production, use Alembic migrations instead."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-
-async def get_session() -> AsyncSession:
-    """Dependency injection for FastAPI routes."""
-    async with async_session() as session:
-        try:
-            yield session
-        finally:
-            await session.close()
+__all__ = [
+    "Base",
+    "engine",
+    "async_session",
+    "async_session_maker",
+    "get_session",
+    "get_db",
+    "init_database",
+]

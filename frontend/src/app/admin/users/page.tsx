@@ -319,7 +319,7 @@ export default function AdminUsersPage() {
                       {apiKeys.length === 0 && (
                         <tr>
                           <td colSpan={5} className="px-6 py-12 text-center text-slate-500 text-sm">
-                            No API keys generated yet. Click "Generate New API Key" above.
+                            No API keys generated yet. Click &ldquo;Generate New API Key&rdquo; above.
                           </td>
                         </tr>
                       )}

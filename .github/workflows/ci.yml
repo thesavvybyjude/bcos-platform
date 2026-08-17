@@ -37,6 +37,12 @@ jobs:
         run: |
           cd backend
           python -m mypy src/ --ignore-missing-imports || true
+          # NOTE: 67 pre-existing type errors (SQLAlchemy Column[T] vs T narrowing
+          # in api_keys.py, admin.py, etc.) block full enforcement. Tracked as a
+          # follow-up: fix or add `sqlalchemy.ext.mypy.plugin` to mypy config, then
+          # remove `|| true` here. Do not remove until a clean run is verified with
+          # a fresh cache (`rm -rf .mypy_cache`) — this repo's mypy status has been
+          # misreported before.
 
   backend-test:
     name: Backend Tests
@@ -107,7 +113,7 @@ jobs:
       - name: Lint
         run: |
           cd frontend
-          npm run lint || true
+          npm run lint
 
   frontend-build:
     name: Frontend Build

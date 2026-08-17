@@ -14,7 +14,7 @@ export function isAuthenticated(): boolean {
   return !!getAccessToken();
 }
 
-export async function login(email: string, password: str): Promise<void> {
+export async function login(email: string, password: string): Promise<void> {
   const data = await apiRequest<{ access_token: string; refresh_token: string }>("/api/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
