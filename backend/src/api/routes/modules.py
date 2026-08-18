@@ -7,7 +7,7 @@ CRUD endpoints for browsing and retrieving knowledge modules.
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -141,7 +141,10 @@ async def get_stats(session: AsyncSession = Depends(get_session)):
 
 @router.get("/{slug}", response_model=ModuleDetail)
 async def get_module(slug: str, session: AsyncSession = Depends(get_session)):
-    """Get a single module by slug, including all principles, rules, trees, and cross-refs."""
+    """Get a single module by slug, name, or filename, including all principles, rules, trees, and cross-refs."""
+    clean = slug.strip().lower()
+    clean_no_ext = clean[:-3] if clean.endswith(".md") else clean
+
     stmt = (
         select(Module)
         .options(
@@ -150,12 +153,44 @@ async def get_module(slug: str, session: AsyncSession = Depends(get_session)):
             selectinload(Module.decision_trees),
             selectinload(Module.cross_references),
         )
-        .where(Module.slug == slug)
+        .where(
+            or_(
+                Module.slug == slug,
+                func.lower(Module.slug) == clean,
+                func.lower(Module.slug) == clean_no_ext,
+                func.lower(Module.name) == clean,
+                func.lower(Module.name) == clean + ".md",
+                func.lower(Module.name) == clean_no_ext,
+                func.lower(Module.file_path).endswith("/" + clean if not clean.endswith(".md") else clean),
+                func.lower(Module.file_path).endswith("/" + clean_no_ext + ".md"),
+                func.lower(Module.file_path) == clean,
+            )
+        )
     )
     result = await session.execute(stmt)
-    module = result.scalar_one_or_none()
+    module = result.scalars().first()
+
+    if not module:
+        try:
+            import uuid
+            u = uuid.UUID(slug)
+            stmt = (
+                select(Module)
+                .options(
+                    selectinload(Module.principles),
+                    selectinload(Module.rules),
+                    selectinload(Module.decision_trees),
+                    selectinload(Module.cross_references),
+                )
+                .where(Module.id == u)
+            )
+            res = await session.execute(stmt)
+            module = res.scalar_one_or_none()
+        except (ValueError, TypeError):
+            pass
 
     if not module:
         raise HTTPException(status_code=404, detail=f"Module '{slug}' not found")
 
     return module
+
