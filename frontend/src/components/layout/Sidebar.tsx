@@ -20,6 +20,17 @@ import {
   Terminal,
 } from "lucide-react";
 
+import { useAuth } from "@/lib/auth-context";
+import { LogOut, LogIn, Shield, User } from "lucide-react";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import {
+  getCollections,
+  getFavorites,
+  getRecentViews,
+  STORAGE_EVENT,
+} from "@/lib/storage";
+
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/modules", label: "Modules", icon: BookOpen },
@@ -29,26 +40,45 @@ const navItems = [
   { href: "/context", label: "Context Builder", icon: Package },
 ];
 
-const collectionItems = [
-  { href: "/graph?collection=all", label: "All Domains", count: 12, icon: Layers },
-  { href: "/graph?collection=mine", label: "My Collections", count: 8, icon: FolderKanban },
-  { href: "/graph?collection=fav", label: "Favorites", count: 23, icon: Star },
-  { href: "/graph?collection=recent", label: "Recent", count: 15, icon: Clock },
-];
-
-const systemItems = [
-  { href: "/modules", label: "Settings", icon: Settings },
-  { href: "/orchestrator", label: "Integrations", icon: Sliders },
-  { href: "/search", label: "Users", icon: Users },
-  { href: "/context", label: "Logs", icon: Terminal },
-];
-
-import { useAuth } from "@/lib/auth-context";
-import { LogOut, LogIn, Shield, User } from "lucide-react";
-
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+
+  const [domainsCount, setDomainsCount] = useState<number>(64);
+  const [collectionsCount, setCollectionsCount] = useState<number>(3);
+  const [favoritesCount, setFavoritesCount] = useState<number>(0);
+  const [recentCount, setRecentCount] = useState<number>(0);
+
+  function refreshCounts() {
+    setCollectionsCount(getCollections().length);
+    setFavoritesCount(getFavorites().length);
+    setRecentCount(getRecentViews().length);
+  }
+
+  useEffect(() => {
+    refreshCounts();
+
+    async function loadStats() {
+      try {
+        const stats = await api.getStats();
+        if (stats && stats.departments) {
+          setDomainsCount(stats.departments.length);
+        }
+      } catch {}
+    }
+    loadStats();
+
+    const onStorageChange = () => refreshCounts();
+    window.addEventListener(STORAGE_EVENT, onStorageChange);
+    return () => window.removeEventListener(STORAGE_EVENT, onStorageChange);
+  }, []);
+
+  const collectionItems = [
+    { href: "/domains", label: "All Domains", count: domainsCount, icon: Layers },
+    { href: "/collections", label: "My Collections", count: collectionsCount, icon: FolderKanban },
+    { href: "/favorites", label: "Favorites", count: favoritesCount, icon: Star },
+    { href: "/recent", label: "Recent", count: recentCount, icon: Clock },
+  ];
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-white/5 bg-[#0c1324]/95 backdrop-blur-2xl select-none">
@@ -129,18 +159,25 @@ export default function Sidebar() {
           </p>
           <div className="space-y-1">
             {collectionItems.map((item) => {
+              const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
               const Icon = item.icon;
               return (
                 <Link
                   key={item.label}
                   href={item.href}
-                  className="group flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium text-slate-400 hover:bg-white/[0.03] hover:text-white transition-all"
+                  className={`group flex items-center justify-between rounded-lg px-3 py-2 text-xs font-medium transition-all ${
+                    isActive
+                      ? "bg-[#6b89ff]/20 text-[#b8c4ff] ring-1 ring-[#6b89ff]/30 font-semibold"
+                      : "text-slate-400 hover:bg-white/[0.03] hover:text-white"
+                  }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Icon className="h-4 w-4 text-slate-400 group-hover:text-slate-200" />
+                    <Icon className={`h-4 w-4 ${isActive ? "text-[#b8c4ff]" : "text-slate-400 group-hover:text-slate-200"}`} />
                     <span>{item.label}</span>
                   </div>
-                  <span className="font-mono text-[10px] text-slate-400">{item.count}</span>
+                  <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${isActive ? "bg-[#6b89ff]/30 text-white" : "text-slate-400 bg-white/[0.03]"}`}>
+                    {item.count}
+                  </span>
                 </Link>
               );
             })}
