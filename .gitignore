@@ -67,6 +67,10 @@ coverage/
 # Misc
 *.tmp
 *.bak
+*.err
+*.out
+*.patch
 
 # Docker Compose override
 docker-compose.override.yml
+
