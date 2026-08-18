@@ -10,7 +10,8 @@ import sys
 from pathlib import Path
 
 # Fix encoding on Windows console
-sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 # Configuration
 BASE_PATH = Path(__file__).resolve().parent.parent / "data" / "business_context"

@@ -97,7 +97,7 @@ class Settings(BaseSettings):
     MCP_SERVER_PORT: int = Field(default=9000, validation_alias="MCP_SERVER_PORT")
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(BASE_DIR / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
