@@ -21,13 +21,13 @@ import {
 } from "lucide-react";
 
 interface AdminStats {
-  total_modules: int;
-  total_users: int;
-  total_audit_events: int;
-  health_score: float;
-  validation_errors: int;
-  validation_warnings: int;
-  system_status: str;
+  total_modules: number;
+  total_users: number;
+  total_audit_events: number;
+  health_score: number;
+  validation_errors: number;
+  validation_warnings: number;
+  system_status: string;
 }
 
 export default function AdminDashboardPage() {

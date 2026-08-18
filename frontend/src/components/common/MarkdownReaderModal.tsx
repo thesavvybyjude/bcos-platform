@@ -33,12 +33,13 @@ export function MarkdownReaderModal({ slug, isOpen, onClose }: MarkdownReaderMod
 
   useEffect(() => {
     if (!isOpen || !slug) return;
+    const currentSlug = slug;
 
     async function load() {
       setLoading(true);
       setError(null);
       try {
-        const cleanSlug = slug.replace(/^dept-/, "").replace(/\.md$/, "");
+        const cleanSlug = currentSlug.replace(/^dept-/, "").replace(/\.md$/, "");
         const data = await api.getModule(cleanSlug);
         setModuleData(data);
       } catch (err: any) {
@@ -146,15 +147,15 @@ export function MarkdownReaderModal({ slug, isOpen, onClose }: MarkdownReaderMod
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
                 <div className="p-3 bg-[#070d1f] rounded-xl border border-white/5">
                   <span className="text-slate-400 block text-[10px] uppercase">Principles</span>
-                  <span className="text-[#b8c4ff] font-bold text-sm">{moduleData.principle_count || 0} Principles</span>
+                  <span className="text-[#b8c4ff] font-bold text-sm">{moduleData.principles.length} Principles</span>
                 </div>
                 <div className="p-3 bg-[#070d1f] rounded-xl border border-white/5">
                   <span className="text-slate-400 block text-[10px] uppercase">Rules</span>
-                  <span className="text-emerald-400 font-bold text-sm">{moduleData.rule_count || 0} Directives</span>
+                  <span className="text-emerald-400 font-bold text-sm">{moduleData.rules.length} Directives</span>
                 </div>
                 <div className="p-3 bg-[#070d1f] rounded-xl border border-white/5">
                   <span className="text-slate-400 block text-[10px] uppercase">Decision Trees</span>
-                  <span className="text-amber-400 font-bold text-sm">{moduleData.decision_tree_count || 0} Frameworks</span>
+                  <span className="text-amber-400 font-bold text-sm">{moduleData.decision_trees.length} Frameworks</span>
                 </div>
                 <div className="p-3 bg-[#070d1f] rounded-xl border border-white/5">
                   <span className="text-slate-400 block text-[10px] uppercase">Relevance</span>

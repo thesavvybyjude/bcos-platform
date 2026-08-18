@@ -340,7 +340,7 @@ export function KnowledgeGraphStudio() {
 
   // Canvas Mouse Pan Handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 0 && (activeTool === "pan" || e.spaceKey)) {
+    if (e.button === 0 && activeTool === "pan") {
       setIsPanning(true);
       setDragStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
     }
