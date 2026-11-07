@@ -46,7 +46,7 @@ The BCOS Platform turns a folder of Markdown files (the BCOS knowledge base) int
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-org/bcos-platform.git
+git clone https://github.com/thesavvybyjude/bcos-platform.git
 cd bcos-platform
 ```
 
@@ -207,3 +207,7 @@ Proprietary / Internal Use Only. See [LICENSE](LICENSE).
 Built with ❤️ using FastAPI, Next.js, PostgreSQL, Neo4j, Chroma, and Tailwind CSS.
 
 **Version:** 1.0.0
+
+---
+
+Built by [Jude Thompson](https://github.com/thesavvybyjude)
